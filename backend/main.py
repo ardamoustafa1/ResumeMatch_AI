@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from backend.db.connection import db_pool
 from backend.tasks.progress_events import async_redis_client
 
-from backend.api.v1.routes import analysis, telegram, health
+from backend.api.v1.routes import analysis, telegram, health, extract
 from backend.api.v1 import websocket
 
 logging.basicConfig(level=logging.INFO)
@@ -71,6 +71,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Include HTTP Routers
 app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["Analysis"])
+app.include_router(extract.router, prefix="/api/v1/extract-text", tags=["Extraction"])
 app.include_router(telegram.router, prefix="/api/v1/telegram", tags=["Telegram"])
 
 # Include WebSocket Router

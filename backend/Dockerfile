@@ -7,6 +7,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    tesseract-ocr \
+    libtesseract-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -27,9 +29,10 @@ RUN groupadd -g 999 appuser && \
 
 WORKDIR /app
 
-# Install postgres client libraries for runtime (if asyncpg requires native pg bindings)
+# Install postgres client libraries for runtime and tesseract for OCR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 curl \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the virtual environment from the builder stage
