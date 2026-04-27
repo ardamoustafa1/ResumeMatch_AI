@@ -92,7 +92,7 @@ async def update_analysis_result(
     """
     query = """
         UPDATE analyses
-        SET status = $1, result = $2::jsonb, updated_at = CURRENT_TIMESTAMP
+        SET status = $1, result = $2::jsonb
         WHERE id = $3::uuid;
     """
     result_json = json.dumps(result) if result else None

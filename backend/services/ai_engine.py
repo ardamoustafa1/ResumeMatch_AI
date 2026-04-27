@@ -5,7 +5,7 @@ import asyncio
 from typing import Dict, Any
 
 import httpx
-from openai import AsyncOpenAI, OpenAIError
+from groq import AsyncGroq, APIError
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
 from backend.models.schemas import (
@@ -19,13 +19,13 @@ from backend.models.schemas import (
 logger = logging.getLogger(__name__)
 
 # --- Configuration ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:8b")
 
-# Initialize OpenAI client if key is available
-openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+# Initialize Groq client if key is available
+groq_client = AsyncGroq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 # --- Exceptions ---
 class AnalysisTimeoutError(Exception):
@@ -70,13 +70,13 @@ You must output ONLY valid JSON matching this exact structure:
 
 # --- Helper Methods ---
 
-async def _call_openai(system_prompt: str, user_prompt: str) -> str:
-    """Calls OpenAI gpt-4o-mini."""
-    if not openai_client:
-        raise OpenAIError("OPENAI_API_KEY is not set.")
+async def _call_groq(system_prompt: str, user_prompt: str) -> str:
+    """Calls Groq API."""
+    if not groq_client:
+        raise APIError("GROQ_API_KEY is not set.")
     
-    response = await openai_client.chat.completions.create(
-        model=OPENAI_MODEL,
+    response = await groq_client.chat.completions.create(
+        model=GROQ_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
@@ -118,14 +118,14 @@ async def _call_ollama(system_prompt: str, user_prompt: str) -> str:
 async def _generate_json(system_prompt: str, user_prompt: str) -> Dict[str, Any]:
     """
     Primary orchestrator for AI generation. 
-    Tries OpenAI first, falls back to Ollama on OpenAIError or missing key.
+    Tries Groq first, falls back to Ollama on APIError or missing key.
     Retries once if JSONDecodeError occurs.
     """
     raw_response = ""
     try:
-        raw_response = await _call_openai(system_prompt, user_prompt)
-    except OpenAIError as e:
-        logger.warning(f"OpenAI failed ({e}). Falling back to Ollama.")
+        raw_response = await _call_groq(system_prompt, user_prompt)
+    except Exception as e:
+        logger.warning(f"Groq failed ({e}). Falling back to Ollama.")
         raw_response = await _call_ollama(system_prompt, user_prompt)
         
     try:

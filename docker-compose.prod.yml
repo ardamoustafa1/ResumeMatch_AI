@@ -18,6 +18,7 @@ services:
         max-file: "3"
 
   worker:
+    command: celery -A backend.tasks.celery_app worker -Q celery,high_priority --loglevel=warning
     volumes: []
     restart: unless-stopped
     deploy:

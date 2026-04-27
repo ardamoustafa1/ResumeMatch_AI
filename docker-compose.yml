@@ -13,7 +13,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/networkforge
       - REDIS_URL=redis://redis:6379/0
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     depends_on:
       postgres:
@@ -25,13 +25,13 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: celery -A backend.tasks.celery_app worker --loglevel=info
+    command: celery -A backend.tasks.celery_app worker -Q celery,high_priority --loglevel=info
     volumes:
       - .:/app
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/networkforge
       - REDIS_URL=redis://redis:6379/0
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     depends_on:
       postgres:
