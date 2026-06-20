@@ -158,7 +158,7 @@ export default function AnalysisDetailPage() {
                 <div key={title} className="rounded-xl bg-zinc-950 p-4 border border-zinc-800">
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-blue-300">{title}</h3>
-                    <button onClick={() => void copy(text as string)} className="text-zinc-500 hover:text-white p-2">
+                    <button aria-label={`Copy ${title}`} onClick={() => void copy(text as string)} className="text-zinc-500 hover:text-white p-2">
                       <Clipboard className="size-4" />
                     </button>
                   </div>
@@ -178,7 +178,7 @@ export default function AnalysisDetailPage() {
               <div className="rounded-xl bg-zinc-950 p-4 border border-zinc-800">
                 <div className="flex justify-between items-center mb-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Suggested headline</p>
-                  <button onClick={() => void copy(result.profile_improvements!.headline_after)} className="text-zinc-500 hover:text-white">
+                  <button aria-label="Copy suggested headline" onClick={() => void copy(result.profile_improvements!.headline_after)} className="text-zinc-500 hover:text-white">
                       <Clipboard className="size-4" />
                   </button>
                 </div>
@@ -187,7 +187,7 @@ export default function AnalysisDetailPage() {
               <div className="rounded-xl bg-zinc-950 p-4 border border-zinc-800">
                 <div className="flex justify-between items-center mb-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">About section</p>
-                  <button onClick={() => void copy(result.profile_improvements!.about_section)} className="text-zinc-500 hover:text-white">
+                  <button aria-label="Copy about section" onClick={() => void copy(result.profile_improvements!.about_section)} className="text-zinc-500 hover:text-white">
                       <Clipboard className="size-4" />
                   </button>
                 </div>

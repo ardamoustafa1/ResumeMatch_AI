@@ -159,9 +159,11 @@ export default function Home() {
       <footer className="border-t border-white/10 py-10">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 sm:flex-row text-zinc-500 text-sm">
           <p>© {new Date().getFullYear()} ResumeMatch AI. All rights reserved.</p>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
             <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
             <Link href="/terms" className="hover:text-white transition">Terms</Link>
+            <Link href="/dpa" className="hover:text-white transition">DPA</Link>
+            <a href="mailto:security@networkforge.ai" className="hover:text-white transition">Security Contact</a>
           </div>
         </div>
       </footer>

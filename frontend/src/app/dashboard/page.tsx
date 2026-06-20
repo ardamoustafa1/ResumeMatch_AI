@@ -24,6 +24,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import Link from "next/link"
 import { apiFetch, websocketUrl } from "@/lib/api"
 import type {
@@ -114,7 +125,6 @@ export default function DashboardPage() {
   }
   
   async function deleteAnalysis(id: string) {
-    if (!confirm("Are you sure you want to delete this analysis?")) return
     try {
       await apiFetch(`/analysis/${id}`, { method: "DELETE" })
       toast.success("Analysis deleted.")
@@ -383,16 +393,31 @@ export default function DashboardPage() {
                       <span className="rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300">
                         {item.status.replace("_", " ")}
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          void deleteAnalysis(item.id)
-                        }}
-                        className="text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
-                        title="Delete"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
+                            title="Delete"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-zinc-950 border-zinc-800">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-zinc-400">
+                              This action cannot be undone. This will permanently delete your
+                              analysis and remove the data from our servers.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="bg-zinc-900 text-white border-zinc-800 hover:bg-zinc-800">Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => void deleteAnalysis(item.id)} className="bg-red-600 hover:bg-red-700 text-white">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 ))}
