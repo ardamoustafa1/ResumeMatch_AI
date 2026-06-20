@@ -175,44 +175,47 @@ async def refresh_access_token(
         )
 
     token_hash = hash_token(refresh_token)
-    record = await conn.fetchrow(
-        """
-        SELECT rt.id, rt.user_id, rt.expires_at, rt.revoked_at, u.email, u.is_active
-        FROM refresh_tokens rt
-        JOIN users u ON u.id = rt.user_id
-        WHERE rt.token_hash = $1
-        FOR UPDATE
-        """,
-        token_hash,
-    )
     now = datetime.now(timezone.utc)
-    if (
-        not record
-        or record["revoked_at"] is not None
-        or record["expires_at"] <= now
-        or not record["is_active"]
-    ):
-        _clear_auth_cookies(response)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
+    
+    async with conn.transaction():
+        record = await conn.fetchrow(
+            """
+            SELECT rt.id, rt.user_id, rt.expires_at, rt.revoked_at, u.email, u.is_active
+            FROM refresh_tokens rt
+            JOIN users u ON u.id = rt.user_id
+            WHERE rt.token_hash = $1
+            FOR UPDATE
+            """,
+            token_hash,
+        )
+        if (
+            not record
+            or record["revoked_at"] is not None
+            or record["expires_at"] <= now
+            or not record["is_active"]
+        ):
+            _clear_auth_cookies(response)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+
+        new_refresh_token, new_digest, expires_at = create_refresh_token()
+        await conn.execute(
+            "UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2",
+            now,
+            record["id"],
+        )
+        await conn.execute(
+            """
+            INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+            """,
+            record["user_id"],
+            new_digest,
+            expires_at,
         )
 
-    new_refresh_token, new_digest, expires_at = create_refresh_token()
-    await conn.execute(
-        "UPDATE refresh_tokens SET revoked_at = $1 WHERE id = $2",
-        now,
-        record["id"],
-    )
-    await conn.execute(
-        """
-        INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-        VALUES ($1, $2, $3)
-        """,
-        record["user_id"],
-        new_digest,
-        expires_at,
-    )
     access_token = create_access_token(subject=record["email"])
     _set_auth_cookies(response, access_token, new_refresh_token)
     return {"status": "success"}
@@ -253,31 +256,33 @@ async def verify_email(
     payload: VerifyEmailRequest,
     conn: Connection = Depends(get_db),
 ):
-    record = await conn.fetchrow(
-        """
-        SELECT id, user_id, expires_at, used_at
-        FROM email_verification_tokens
-        WHERE token_hash = $1
-        FOR UPDATE
-        """,
-        hash_token(payload.token),
-    )
     now = datetime.now(timezone.utc)
-    if not record or record["used_at"] or record["expires_at"] <= now:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification link is invalid or expired.",
+    
+    async with conn.transaction():
+        record = await conn.fetchrow(
+            """
+            SELECT id, user_id, expires_at, used_at
+            FROM email_verification_tokens
+            WHERE token_hash = $1
+            FOR UPDATE
+            """,
+            hash_token(payload.token),
         )
-    await conn.execute(
-        "UPDATE email_verification_tokens SET used_at = $1 WHERE id = $2",
-        now,
-        record["id"],
-    )
-    await conn.execute(
-        "UPDATE users SET email_verified = TRUE, updated_at = $1 WHERE id = $2",
-        now,
-        record["user_id"],
-    )
+        if not record or record["used_at"] or record["expires_at"] <= now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification link is invalid or expired.",
+            )
+        await conn.execute(
+            "UPDATE email_verification_tokens SET used_at = $1 WHERE id = $2",
+            now,
+            record["id"],
+        )
+        await conn.execute(
+            "UPDATE users SET email_verified = TRUE, updated_at = $1 WHERE id = $2",
+            now,
+            record["user_id"],
+        )
     return {"status": "verified"}
 
 
@@ -317,41 +322,43 @@ async def reset_password(
     payload: ResetPasswordRequest,
     conn: Connection = Depends(get_db),
 ):
-    record = await conn.fetchrow(
-        """
-        SELECT id, user_id, expires_at, used_at
-        FROM password_reset_tokens
-        WHERE token_hash = $1
-        FOR UPDATE
-        """,
-        hash_token(payload.token),
-    )
     now = datetime.now(timezone.utc)
-    if not record or record["used_at"] or record["expires_at"] <= now:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password reset link is invalid or expired.",
+
+    async with conn.transaction():
+        record = await conn.fetchrow(
+            """
+            SELECT id, user_id, expires_at, used_at
+            FROM password_reset_tokens
+            WHERE token_hash = $1
+            FOR UPDATE
+            """,
+            hash_token(payload.token),
         )
-    await conn.execute(
-        "UPDATE password_reset_tokens SET used_at = $1 WHERE id = $2",
-        now,
-        record["id"],
-    )
-    await conn.execute(
-        "UPDATE users SET hashed_password = $1, updated_at = $2 WHERE id = $3",
-        get_password_hash(payload.password),
-        now,
-        record["user_id"],
-    )
-    await conn.execute(
-        """
-        UPDATE refresh_tokens
-        SET revoked_at = $1
-        WHERE user_id = $2 AND revoked_at IS NULL
-        """,
-        now,
-        record["user_id"],
-    )
+        if not record or record["used_at"] or record["expires_at"] <= now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password reset link is invalid or expired.",
+            )
+        await conn.execute(
+            "UPDATE password_reset_tokens SET used_at = $1 WHERE id = $2",
+            now,
+            record["id"],
+        )
+        await conn.execute(
+            "UPDATE users SET hashed_password = $1, updated_at = $2 WHERE id = $3",
+            get_password_hash(payload.password),
+            now,
+            record["user_id"],
+        )
+        await conn.execute(
+            """
+            UPDATE refresh_tokens
+            SET revoked_at = $1
+            WHERE user_id = $2 AND revoked_at IS NULL
+            """,
+            now,
+            record["user_id"],
+        )
     return {"status": "password_updated"}
 
 

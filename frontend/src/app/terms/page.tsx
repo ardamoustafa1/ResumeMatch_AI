@@ -15,7 +15,7 @@ export default function TermsPage() {
         <h2 className="text-2xl font-semibold text-white mt-8">2. User Responsibilities</h2>
         <p>You are responsible for ensuring that the data you provide does not violate any third-party confidentiality agreements. You agree not to misuse the Chrome Extension to scrape LinkedIn automatically.</p>
         <h2 className="text-2xl font-semibold text-white mt-8">3. Open Source</h2>
-        <p>This software is provided "as is", without warranty of any kind. You are free to self-host and modify the source code under the MIT License.</p>
+        <p>This software is provided &quot;as is&quot;, without warranty of any kind. You are free to self-host and modify the source code under the MIT License.</p>
       </div>
     </main>
   )

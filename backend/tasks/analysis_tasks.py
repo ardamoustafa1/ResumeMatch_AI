@@ -192,3 +192,11 @@ def run_analysis_task(self, analysis_id: str):
             raise
         retry_delay = min(60, 5 * (2**self.request.retries))
         raise self.retry(exc=exc, countdown=retry_delay)
+
+
+@celery_app.task(name="backend.tasks.analysis_tasks.purge_old_data_task")
+def purge_old_data_task() -> None:
+    """Scheduled task to purge analysis data older than 30 days for GDPR compliance."""
+    from scripts.purge_old_data import purge_old_data
+    import asyncio
+    asyncio.run(purge_old_data())

@@ -21,6 +21,9 @@ celery_app.conf.update(
         "backend.tasks.analysis_tasks.run_analysis_task": {"queue": "high_priority"}
     },
     beat_schedule={
-        # Hook for future scheduled tasks, e.g., weekly summaries or retention cleanup
+        "purge-old-data-daily": {
+            "task": "backend.tasks.analysis_tasks.purge_old_data_task",
+            "schedule": 86400.0, # run every 24 hours
+        }
     },
 )

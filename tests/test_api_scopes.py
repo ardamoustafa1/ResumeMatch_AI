@@ -31,6 +31,7 @@ async def test_extension_api_key_cannot_access_me(client: AsyncClient, mocker):
         yield connection
     
     app.dependency_overrides[get_db] = override
+    prev_user_override = app.dependency_overrides.pop(get_current_user, None)
     
     # We must patch token verification to fallback to api key logic
     mocker.patch("jose.jwt.decode", side_effect=Exception("Invalid token"))
@@ -43,6 +44,8 @@ async def test_extension_api_key_cannot_access_me(client: AsyncClient, mocker):
         )
     finally:
         app.dependency_overrides[get_db] = override_get_db
+        if prev_user_override:
+            app.dependency_overrides[get_current_user] = prev_user_override
 
     assert response.status_code == 403
     assert "API key does not have sufficient permissions" in response.json()["detail"]
@@ -53,9 +56,12 @@ async def test_extension_api_key_can_access_analysis(client: AsyncClient, mocker
         yield connection
     
     app.dependency_overrides[get_db] = override
+    prev_user_override = app.dependency_overrides.pop(get_current_user, None)
+
     mocker.patch("jose.jwt.decode", side_effect=Exception("Invalid token"))
     mocker.patch("backend.api.deps.hash_token", return_value="hashed")
-    mocker.patch("backend.api.v1.routes.analysis.get_user_analyses", return_value=[])
+    # Instead of patching get_user_analyses, just mock the fetch
+    connection.fetch = mocker.AsyncMock(return_value=[])
 
     try:
         response = await client.get(
@@ -64,6 +70,8 @@ async def test_extension_api_key_can_access_analysis(client: AsyncClient, mocker
         )
     finally:
         app.dependency_overrides[get_db] = override_get_db
+        if prev_user_override:
+            app.dependency_overrides[get_current_user] = prev_user_override
 
     # Expecting 200 OK or similar, but definitely not 403 API Scope block
     assert response.status_code != 403

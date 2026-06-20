@@ -135,7 +135,7 @@ export default function Home() {
               {
                 title: "Chrome Extension",
                 description: "Analyze any job post instantly on LinkedIn without leaving the browser tab.",
-                icon: Extension, // Lucide doesn't have an Extension icon natively that matches, but we'll use Layers
+                icon: Layers, // Lucide doesn't have an Extension icon natively that matches, but we'll use Layers
               },
             ].map((feature) => (
               <div

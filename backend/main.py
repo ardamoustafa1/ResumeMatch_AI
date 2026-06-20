@@ -117,7 +117,7 @@ app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["Analysis"])
 app.include_router(extract.router, prefix="/api/v1/extract-text", tags=["Extraction"])
 app.include_router(telegram.router, prefix="/api/v1/telegram", tags=["Telegram"])
-app.include_router(websocket.router, prefix="/ws", tags=["WebSockets"])
+app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSockets"])
 
 
 @app.get("/")

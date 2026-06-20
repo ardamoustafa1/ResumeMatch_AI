@@ -61,7 +61,7 @@ async def get_current_user(
         if api_key_record["revoked_at"] is not None or (api_key_record["expires_at"] and api_key_record["expires_at"] <= now):
             raise credentials_exception
         user = dict(api_key_record)
-        if user.get("scopes") == "extension":
+        if "extension" in str(user.get("scopes", "")):
             allowed_paths = ["/api/v1/analysis", "/api/v1/extract/linkedin"]
             is_allowed = any(request.url.path.startswith(p) for p in allowed_paths)
             if not is_allowed or request.method == "DELETE":

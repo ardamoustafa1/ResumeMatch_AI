@@ -52,7 +52,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: celery -A backend.tasks.celery_app worker -Q high_priority --loglevel=info
+    command: celery -A backend.tasks.celery_app worker -B -Q high_priority --loglevel=info
     volumes:
       - .:/app
     environment:
@@ -114,6 +114,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    entrypoint: [ "sh", "-c", "ollama serve & sleep 5 && ollama pull llama3:8b && wait" ]
     ports:
       - "11434:11434"
     volumes:

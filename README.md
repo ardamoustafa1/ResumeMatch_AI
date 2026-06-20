@@ -24,7 +24,7 @@ ResumeMatch AI is not a generic ChatGPT wrapper. It is a highly engineered, priv
 
 ## Features
 
-- **Deterministic Semantic Matching**: We use AI for extraction but purely mathematical logic for calculating the exact percentage match between your CV and the role, avoiding LLM hallucinations.
+- **LLM-Extracted Skill Ratio**: Calculate exact match percentages based on extracted entities, rather than relying on LLM hallucinations for the final number.
 - **Actionable Gap Analysis**: Highlights exact keywords and tools missing from your CV that the ATS is looking for.
 - **Outreach Draft Generation**: Automatically writes initial connection notes and 7-day follow-ups for hiring managers.
 - **Chrome Extension Integration**: Generates API keys to securely analyze job postings directly from your LinkedIn tab.

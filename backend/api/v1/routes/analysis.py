@@ -101,12 +101,24 @@ async def export_analyses(
     conn: Connection = Depends(get_db),
 ):
     """Export all analysis data for GDPR/Data Portability compliance."""
-    records = await get_user_analyses(
-        conn,
-        str(current_user["id"]),
-        limit=1000,
-        offset=0,
+    rows = await conn.fetch(
+        """
+        SELECT id, user_id, cv_text, jd_text, company, recruiter_name, status, result, created_at
+        FROM analyses
+        WHERE user_id = $1::uuid
+        ORDER BY created_at DESC
+        """,
+        str(current_user["id"])
     )
+    
+    import json
+    records = []
+    for row in rows:
+        record = dict(row)
+        if record.get("result") and isinstance(record["result"], str):
+            record["result"] = json.loads(record["result"])
+        records.append(record)
+        
     return {"data": records}
 
 

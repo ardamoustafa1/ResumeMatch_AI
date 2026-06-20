@@ -27,8 +27,6 @@ export default function AnalysisDetailPage() {
           setRecord({
             id: data.analysis_id,
             user_id: "demo",
-            cv_text: "",
-            jd_text: "",
             company: "Demo Mode - Stripe",
             recruiter_name: "Jane",
             status: "completed",
