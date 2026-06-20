@@ -1,6 +1,8 @@
+import asyncio
 import logging
-from fastapi import APIRouter, Depends, status
+
 from asyncpg import Connection
+from fastapi import APIRouter, Depends, Response, status
 
 from backend.db.connection import get_db
 from backend.tasks.celery_app import celery_app
@@ -9,42 +11,55 @@ from backend.tasks.progress_events import async_redis_client
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
+@router.get("/live", status_code=status.HTTP_200_OK)
+async def liveness() -> dict[str, str]:
+    return {"status": "alive", "version": "1.0.0"}
+
+
 @router.get("", status_code=status.HTTP_200_OK)
-async def health_check(conn: Connection = Depends(get_db)):
-    health_status = {
+@router.get("/ready", status_code=status.HTTP_200_OK)
+async def readiness(
+    response: Response,
+    conn: Connection = Depends(get_db),
+):
+    health_status: dict[str, str | int] = {
         "status": "healthy",
         "version": "1.0.0",
         "db": "down",
         "redis": "down",
-        "workers": 0
+        "workers": 0,
     }
-    
-    # Check Postgres Connection
+
     try:
         await conn.execute("SELECT 1")
         health_status["db"] = "up"
-    except Exception as e:
-        logger.error(f"DB health check failed: {e}")
-        health_status["status"] = "degraded"
-        
-    # Check Redis Connection
+    except Exception:
+        logger.exception("Database readiness check failed")
+
     try:
         await async_redis_client.ping()
         health_status["redis"] = "up"
-    except Exception as e:
-        logger.error(f"Redis health check failed: {e}")
-        health_status["status"] = "degraded"
-        
-    # Check Celery Worker Count
+    except Exception:
+        logger.exception("Redis readiness check failed")
+
     try:
-        i = celery_app.control.inspect()
-        active_nodes = i.ping()
+        inspector = celery_app.control.inspect(timeout=1)
+        active_nodes = await asyncio.wait_for(
+            asyncio.to_thread(inspector.ping),
+            timeout=2,
+        )
         if active_nodes:
             health_status["workers"] = len(active_nodes)
-        else:
-            health_status["status"] = "degraded"
-    except Exception as e:
-        logger.error(f"Celery health check failed: {e}")
+    except Exception:
+        logger.warning("Celery readiness check failed")
+
+    if (
+        health_status["db"] != "up"
+        or health_status["redis"] != "up"
+        or health_status["workers"] == 0
+    ):
         health_status["status"] = "degraded"
-        
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
     return health_status
