@@ -87,29 +87,60 @@ async def register(
             detail="An account with this email already exists.",
         )
 
-    query = """
-        INSERT INTO users (email, hashed_password)
-        VALUES ($1, $2)
-        RETURNING id, email, is_active, is_superuser, email_verified, created_at
-    """
-    new_user = await conn.fetchrow(query, email, get_password_hash(user_in.password))
-    verification_token, token_hash, expires_at = create_one_time_token(
-        timedelta(hours=24)
-    )
-    await conn.execute(
+    async with conn.transaction():
+        query = """
+            INSERT INTO users (email, hashed_password)
+            VALUES ($1, $2)
+            RETURNING id, email, is_active, is_superuser, email_verified, created_at
         """
-        INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-        VALUES ($1, $2, $3)
-        """,
-        new_user["id"],
-        token_hash,
-        expires_at,
-    )
+        new_user = await conn.fetchrow(query, email, get_password_hash(user_in.password))
+        verification_token, token_hash, expires_at = create_one_time_token(
+            timedelta(hours=24)
+        )
+        await conn.execute(
+            """
+            INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+            """,
+            new_user["id"],
+            token_hash,
+            expires_at,
+        )
     try:
         await send_verification_email(email, verification_token)
     except Exception:
         logger.exception("Verification email delivery failed")
     return dict(new_user)
+
+@router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("3/hour")
+async def resend_verification(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    conn: Connection = Depends(get_db),
+):
+    user = await conn.fetchrow(
+        "SELECT id, email, email_verified FROM users WHERE email = $1",
+        str(payload.email).lower(),
+    )
+    if user and not user["email_verified"]:
+        verification_token, token_hash, expires_at = create_one_time_token(
+            timedelta(hours=24)
+        )
+        await conn.execute(
+            """
+            INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+            """,
+            user["id"],
+            token_hash,
+            expires_at,
+        )
+        try:
+            await send_verification_email(user["email"], verification_token)
+        except Exception:
+            logger.exception("Verification email delivery failed")
+    return {"message": "If the account exists and is unverified, a new verification link was sent."}
 
 
 @router.post("/login")

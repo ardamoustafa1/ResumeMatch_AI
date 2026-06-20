@@ -10,7 +10,6 @@ pytestmark = pytest.mark.asyncio
 
 async def test_match_score_returns_valid_range(mocker, sample_cv, sample_jd):
     response = {
-        "score": 85,
         "matched_skills": ["Python"],
         "missing_skills": ["Kubernetes"],
         "improvement_suggestions": ["Add measurable platform outcomes"],
@@ -23,7 +22,7 @@ async def test_match_score_returns_valid_range(mocker, sample_cv, sample_jd):
     result = await analyze_cv_jd_match(sample_cv, sample_jd)
 
     assert isinstance(result, MatchResult)
-    assert result.score == 85
+    assert result.score == 50
 
 
 async def test_groq_falls_back_to_ollama(mocker, sample_cv, sample_jd):
@@ -35,9 +34,8 @@ async def test_groq_falls_back_to_ollama(mocker, sample_cv, sample_jd):
         "backend.services.ai_engine._call_ollama",
         return_value=json.dumps(
             {
-                "score": 90,
-                "matched_skills": [],
-                "missing_skills": [],
+                "matched_skills": ["Docker", "Python"],
+                "missing_skills": ["AWS"],
                 "improvement_suggestions": [],
             }
         ),
@@ -46,7 +44,7 @@ async def test_groq_falls_back_to_ollama(mocker, sample_cv, sample_jd):
     result = await analyze_cv_jd_match(sample_cv, sample_jd)
 
     ollama.assert_called_once()
-    assert result.score == 90
+    assert result.score == 66
 
 
 async def test_json_parse_failure_retries(mocker):

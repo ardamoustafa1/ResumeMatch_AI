@@ -19,7 +19,7 @@ export default function Home() {
             >
               Sign in
             </Link>
-            <Button asChild className="rounded-full bg-white text-black hover:bg-zinc-200">
+            <Button asChild className="rounded-full !bg-white !text-black hover:!bg-zinc-200">
               <Link href="/login">Get Started</Link>
             </Button>
           </div>
@@ -47,7 +47,7 @@ export default function Home() {
               <Button
                 asChild
                 size="lg"
-                className="h-12 w-full rounded-full bg-white px-8 text-base text-black hover:bg-zinc-200 sm:w-auto"
+                className="h-12 w-full rounded-full !bg-white px-8 text-base !text-black hover:!bg-zinc-200 sm:w-auto"
               >
                 <Link href="/login">
                   Start Analyzing Now <ArrowRight className="ml-2 size-4" />

@@ -62,7 +62,12 @@ async def get_current_user(
             raise credentials_exception
         user = dict(api_key_record)
         if "extension" in str(user.get("scopes", "")):
-            allowed_paths = ["/api/v1/analysis", "/api/v1/extract/linkedin"]
+            if request.url.path == "/api/v1/analysis/export":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="API key does not have sufficient permissions for this action",
+                )
+            allowed_paths = ["/api/v1/analysis", "/api/v1/extract-text"]
             is_allowed = any(request.url.path.startswith(p) for p in allowed_paths)
             if not is_allowed or request.method == "DELETE":
                 raise HTTPException(

@@ -17,7 +17,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-development-only-change-before-production}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3:8b}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       ALLOWED_ORIGINS: http://localhost:3000
@@ -52,7 +52,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: celery -A backend.tasks.celery_app worker -B -Q high_priority --loglevel=info
+    command: celery -A backend.tasks.celery_app worker -B -Q celery,high_priority --loglevel=info
     volumes:
       - .:/app
     environment:
@@ -62,7 +62,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-development-only-change-before-production}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3:8b}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     depends_on:
@@ -114,7 +114,6 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    entrypoint: [ "sh", "-c", "ollama serve & sleep 5 && ollama pull llama3:8b && wait" ]
     ports:
       - "11434:11434"
     volumes:

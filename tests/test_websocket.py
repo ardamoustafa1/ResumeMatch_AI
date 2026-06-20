@@ -5,23 +5,27 @@ from backend.main import app
 pytestmark = pytest.mark.asyncio
 
 async def test_websocket_ticket_generation(client: AsyncClient, mocker):
-    mocker.patch("backend.core.websocket_manager.ws_manager.create_ticket", return_value="ws-ticket-123")
+    mock_set = mocker.patch("backend.api.v1.websocket.async_redis_client.set", return_value=True)
     
     response = await client.post(
-        "/api/v1/ws/ticket",
+        "/api/v1/ws/ticket?analysis_id=123",
         headers={"Authorization": "Bearer fake_token"}
     )
     
-    # We expect 200 and a ticket, but since get_current_user is mocked in conftest, it should work
     assert response.status_code == 200
-    assert response.json()["ticket"] == "ws-ticket-123"
+    assert "ticket" in response.json()
+    mock_set.assert_called_once()
 
 async def test_websocket_connection_requires_ticket(mocker):
-    # Testing actual Starlette WebSocket endpoint is trickier, 
-    # but we can test the auth layer logic.
     from backend.api.v1.websocket import _authorize
+    from fastapi import WebSocket
     
-    mocker.patch("backend.core.websocket_manager.ws_manager.validate_ticket", return_value="user-id")
+    mock_ws = mocker.MagicMock(spec=WebSocket)
+    mock_ws.headers = {}
+    mock_ws.query_params = {"ticket": "test-ticket"}
     
-    user_id = await _authorize("valid-ticket")
-    assert user_id == "user-id"
+    # Mock redis to return None (invalid ticket)
+    mocker.patch("backend.api.v1.websocket.async_redis_client.get", return_value=None)
+    
+    is_valid = await _authorize(mock_ws, "analysis-id")
+    assert is_valid is False

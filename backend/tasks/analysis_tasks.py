@@ -197,6 +197,24 @@ def run_analysis_task(self, analysis_id: str):
 @celery_app.task(name="backend.tasks.analysis_tasks.purge_old_data_task")
 def purge_old_data_task() -> None:
     """Scheduled task to purge analysis data older than 30 days for GDPR compliance."""
-    from scripts.purge_old_data import purge_old_data
+    from datetime import datetime, timedelta, timezone
     import asyncio
-    asyncio.run(purge_old_data())
+    
+    async def _purge():
+        if db_pool.pool is None:
+            await db_pool.connect()
+            
+        if not db_pool.pool:
+            logger.error("Failed to connect to DB for purge task.")
+            return
+
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+        logger.info(f"Purging data older than {cutoff_date.isoformat()}")
+
+        async with db_pool.pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM analyses WHERE created_at < $1", cutoff_date
+            )
+            logger.info(f"Purge complete. Result: {result}")
+            
+    _run(_purge())

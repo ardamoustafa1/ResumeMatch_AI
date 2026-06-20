@@ -56,7 +56,7 @@ export async function apiFetch<T>(
 export function websocketUrl(analysisId: string, ticket: string): string {
   const configured = process.env.NEXT_PUBLIC_WS_URL
   const baseUrl = configured 
-    ? `${configured}/ws/analysis/${analysisId}`
-    : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}${process.env.NODE_ENV === "development" ? ":8000" : ""}/ws/analysis/${analysisId}`;
+    ? `${configured}/api/v1/ws/analysis/${analysisId}`
+    : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}${process.env.NODE_ENV === "development" ? ":8000" : ""}/api/v1/ws/analysis/${analysisId}`;
   return `${baseUrl}?ticket=${ticket}`
 }
