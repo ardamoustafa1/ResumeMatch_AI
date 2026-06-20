@@ -39,6 +39,7 @@ async function handleMatchClick() {
   try {
     let jdText = '';
     const jdSelectors = [
+      '.job-details-jobs-unified-top-card__job-insight', // add more robust ones
       '.jobs-description__container',
       '.jobs-box__html-content',
       'article.jobs-description__container',
@@ -46,15 +47,24 @@ async function handleMatchClick() {
     ];
     for (const s of jdSelectors) {
       const el = document.querySelector(s);
-      if (el) {
-        jdText = el.innerText;
+      if (el && el.innerText.trim()) {
+        jdText = el.innerText.trim();
         break;
       }
     }
     
-    if (!jdText) throw new Error('Job description not found (LinkedIn DOM might have changed).');
+    if (!jdText) {
+      // Fallback
+      const fallbackEl = document.querySelector('.job-view-layout-jobs-details');
+      if (fallbackEl) jdText = fallbackEl.innerText.trim();
+    }
+    
+    if (!jdText) {
+      console.warn('Telemetry: Job description DOM selector failed. LinkedIn layout changed.');
+      throw new Error('Job description not found. LinkedIn layout might have changed.');
+    }
 
-    const { apiToken, cvText } = await chrome.storage.local.get([
+    const { apiToken, cvText } = await chrome.storage.session.get([
       'apiToken',
       'cvText'
     ]);
