@@ -3,14 +3,6 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    tesseract-ocr \
-    libtesseract-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -40,8 +32,9 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/app"
 
-# Copy the application code
-COPY . .
+# Copy only runtime application files
+COPY backend ./backend
+COPY register_user.py setup_mock_user.py ./
 
 # Adjust permissions for non-root execution
 RUN chown -R appuser:appuser /app
@@ -49,7 +42,7 @@ USER appuser
 
 # Healthcheck for FastAPI API
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f http://localhost:8000/api/v1/health/live || exit 1
 
 EXPOSE 8000
 

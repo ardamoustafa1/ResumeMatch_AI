@@ -1,16 +1,16 @@
 """initial schema
 
 Revision ID: 001
-Revises: 
+Revises:
 Create Date: 2026-04-27 21:00:00.000000
 
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '001'
+revision = "001"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -56,7 +56,9 @@ def upgrade() -> None:
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    op.execute("CREATE INDEX idx_outreach_messages_analysis_id ON outreach_messages(analysis_id);")
+    op.execute(
+        "CREATE INDEX idx_outreach_messages_analysis_id ON outreach_messages(analysis_id);"
+    )
 
     op.execute("""
         CREATE TABLE telegram_configs (
