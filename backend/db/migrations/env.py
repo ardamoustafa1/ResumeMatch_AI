@@ -26,6 +26,7 @@ if config.config_file_name is not None:
 
 target_metadata = None
 
+
 def do_run_migrations(connection: Connection) -> None:
     """
     Synchronous function called by the async engine to run migrations.
@@ -33,6 +34,7 @@ def do_run_migrations(connection: Connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()
+
 
 async def run_async_migrations() -> None:
     """
@@ -50,8 +52,10 @@ async def run_async_migrations() -> None:
 
     await connectable.dispose()
 
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     asyncio.run(run_async_migrations())
+
 
 run_migrations_online()

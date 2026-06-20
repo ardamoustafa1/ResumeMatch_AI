@@ -4,10 +4,10 @@ from celery import Celery
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 celery_app = Celery(
-    "networkforge",
+    "resumematch_ai",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["backend.tasks.analysis_tasks"]
+    include=["backend.tasks.analysis_tasks"],
 )
 
 celery_app.conf.update(
@@ -22,5 +22,5 @@ celery_app.conf.update(
     },
     beat_schedule={
         # Hook for future scheduled tasks, e.g., weekly summaries or retention cleanup
-    }
+    },
 )

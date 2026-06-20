@@ -9,11 +9,11 @@ async def create_analysis(
     cv_text: str,
     jd_text: str,
     company: Optional[str] = None,
-    recruiter_name: Optional[str] = None
+    recruiter_name: Optional[str] = None,
 ) -> str:
     """
     Insert a new analysis record into the database.
-    
+
     Args:
         conn (Connection): The asyncpg connection
         user_id (str): The ID of the user requesting the analysis
@@ -21,7 +21,7 @@ async def create_analysis(
         jd_text (str): Job description text
         company (Optional[str]): Hiring company name
         recruiter_name (Optional[str]): Recruiter's name
-        
+
     Returns:
         str: The UUID of the newly created analysis as a string
     """
@@ -31,12 +31,7 @@ async def create_analysis(
         RETURNING id;
     """
     analysis_id = await conn.fetchval(
-        query, 
-        user_id, 
-        cv_text, 
-        jd_text, 
-        company, 
-        recruiter_name
+        query, user_id, cv_text, jd_text, company, recruiter_name
     )
     return str(analysis_id)
 
@@ -44,11 +39,11 @@ async def create_analysis(
 async def get_analysis(conn: Connection, analysis_id: str) -> Optional[Dict[str, Any]]:
     """
     Retrieve an analysis by its ID.
-    
+
     Args:
         conn (Connection): The asyncpg connection
         analysis_id (str): The ID of the analysis
-        
+
     Returns:
         Optional[Dict[str, Any]]: The analysis record as a dictionary, or None if not found
     """
@@ -60,11 +55,11 @@ async def get_analysis(conn: Connection, analysis_id: str) -> Optional[Dict[str,
     row = await conn.fetchrow(query, analysis_id)
     if row:
         record = dict(row)
-        
+
         # Parse JSONB string into python dict if it exists
         if record.get("result") and isinstance(record["result"], str):
             record["result"] = json.loads(record["result"])
-            
+
         # Convert UUID fields to strings for dict serialization
         record["id"] = str(record["id"])
         record["user_id"] = str(record["user_id"])
@@ -73,20 +68,20 @@ async def get_analysis(conn: Connection, analysis_id: str) -> Optional[Dict[str,
 
 
 async def update_analysis_result(
-    conn: Connection, 
-    analysis_id: str, 
-    status: str, 
-    result: Optional[Dict[str, Any]] = None
+    conn: Connection,
+    analysis_id: str,
+    status: str,
+    result: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """
     Update the status and result of an existing analysis.
-    
+
     Args:
         conn (Connection): The asyncpg connection
         analysis_id (str): The ID of the analysis
         status (str): The new status (e.g., 'completed', 'failed')
         result (Optional[Dict[str, Any]]): The JSON result from the AI processing
-        
+
     Returns:
         bool: True if the update was successful, False otherwise
     """
@@ -96,26 +91,23 @@ async def update_analysis_result(
         WHERE id = $3::uuid;
     """
     result_json = json.dumps(result) if result else None
-    
+
     status_str = await conn.execute(query, status, result_json, analysis_id)
     return status_str.endswith("1")
 
 
 async def get_user_analyses(
-    conn: Connection, 
-    user_id: str, 
-    limit: int = 50, 
-    offset: int = 0
+    conn: Connection, user_id: str, limit: int = 50, offset: int = 0
 ) -> List[Dict[str, Any]]:
     """
     Retrieve a list of analyses for a specific user.
-    
+
     Args:
         conn (Connection): The asyncpg connection
         user_id (str): The ID of the user
         limit (int): Pagination limit
         offset (int): Pagination offset
-        
+
     Returns:
         List[Dict[str, Any]]: A list of analysis records
     """
@@ -127,25 +119,27 @@ async def get_user_analyses(
         LIMIT $2 OFFSET $3;
     """
     rows = await conn.fetch(query, user_id, limit, offset)
-    
+
     results = []
     for row in rows:
         record = dict(row)
         record["id"] = str(record["id"])
         record["user_id"] = str(record["user_id"])
         results.append(record)
-        
+
     return results
 
 
-async def get_telegram_config(conn: Connection, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_telegram_config(
+    conn: Connection, user_id: str
+) -> Optional[Dict[str, Any]]:
     """
     Retrieve Telegram configuration for a user.
-    
+
     Args:
         conn (Connection): The asyncpg connection
         user_id (str): The ID of the user
-        
+
     Returns:
         Optional[Dict[str, Any]]: The Telegram config record if active, else None
     """
