@@ -1,130 +1,94 @@
-# NetworkForge 🔨
+<div align="center">
+  <img src="https://raw.githubusercontent.com/ardamoustafa1/NetworkForge/main/frontend/public/icon.svg" alt="ResumeMatch AI Logo" width="120" />
+  <h1>ResumeMatch AI</h1>
+  <p>The Private, Local-First Career Copilot for Top Performers.</p>
 
-[![Build Passing](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)]()
-[![Stars](https://img.shields.io/github/stars/yourusername/networkforge.svg?style=social)]()
+  [![CI](https://github.com/ardamoustafa1/NetworkForge/actions/workflows/ci.yml/badge.svg)](https://github.com/ardamoustafa1/NetworkForge/actions/workflows/ci.yml)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-> **AI copilot that turns your CV into personalized recruiter conversations.**
+  <p>
+    <a href="#features">Features</a> •
+    <a href="#quick-start">5-Minute Quick Start</a> •
+    <a href="#architecture">Architecture</a> •
+    <a href="#roadmap">Roadmap</a>
+  </p>
+</div>
 
-![demo](docs/demo.gif)
+---
 
-## Why NetworkForge?
+## What is ResumeMatch AI?
 
-*   **Most job applications fail because outreach is generic.** Applying through standard portals puts your resume in a black box. Standing out requires targeted, human connection.
-*   **Recruiters get 100+ messages a day; personalization wins.** If you send a generic "Hi, I applied", you get ignored. NetworkForge analyzes your specific CV against their exact Job Description to highlight exactly why you're a match.
-*   **This automates the research and writing, not the thinking.** It gives you the perfect 90% draft. You review, tweak, and hit send. 
+ResumeMatch AI is not a generic ChatGPT wrapper. It is a highly engineered, privacy-obsessed system designed to ingest your professional CV alongside target job descriptions, calculate an exact semantic match score, identify missing technical skills, and draft hyper-personalized LinkedIn outreach messages.
+
+**Your data stays yours.** With our local-first Docker architecture, your PII is never permanently stored on third-party servers.
 
 ## Features
 
-| Feature | Status |
-| :--- | :---: |
-| Match Score (0-100) | ✅ |
-| Missing Skills Detection | ✅ |
-| Personalized LinkedIn DM | ✅ |
-| Follow-up Message (Day 7) | ✅ |
-| Connection Request Note | ✅ |
-| LinkedIn Headline Rewrite | ✅ |
-| About Section Rewrite | ✅ |
-| Telegram Notifications | ✅ |
-| Real-time WebSocket Progress | ✅ |
+- **Deep Semantic Matching**: Calculates a deterministic percentage match between your CV and the role.
+- **Actionable Gap Analysis**: Highlights exact keywords and tools missing from your CV that the ATS is looking for.
+- **Outreach Draft Generation**: Automatically writes initial connection notes and 7-day follow-ups for hiring managers.
+- **Chrome Extension Integration**: Generates API keys to securely analyze job postings directly from your LinkedIn tab.
+- **Privacy by Design**: Scoped API keys, hashed database tokens, robust CSPs, and HttpOnly cookies.
+
+## 5-Minute Quick Start
+
+Zero friction onboarding. Get the entire stack running locally in under 5 minutes.
+
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 20+ (for local frontend dev)
+- Python 3.11+ (for local backend dev)
+
+### Bootstrapping
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/ardamoustafa1/NetworkForge.git resumematch-ai
+   cd resumematch-ai
+   ```
+
+2. **Set up Environment Variables**
+   ```bash
+   cp .env.example .env
+   # Add your preferred LLM API key (e.g., Groq, OpenAI) to the .env file.
+   ```
+
+3. **Spin up the stack**
+   ```bash
+   docker compose up --build -d
+   ```
+
+4. **Access the application**
+   - Frontend Dashboard: [http://localhost:3000](http://localhost:3000)
+   - API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ## Architecture
 
-Built for scale and speed, entirely asynchronous. If OpenAI goes down, the system automatically fails over to local Ollama.
+We use a modern, highly scalable microservices architecture:
 
-```text
-[User / Client]
-       │
-       ├─ (1) POST /api/v1/analyze
-       │
-[FastAPI] ──(2) Save Pending State ──> [PostgreSQL]
-       │
-       ├─ (3) Enqueue Task ──────────> [Redis (Broker)]
-       │                                     │
-       ├─ (4) Return Task ID                 v (5) Consume
-       │                               [Celery Worker]
-       ├─ (6) WS connect <───────────────────┤
-                                             ├─ (7) AI Engine (GPT-4o-mini / Llama3)
-                                             ├─ (8) Update DB [PostgreSQL]
-                                             └─ (9) Notify [Telegram API]
-```
+- **Frontend**: Next.js 15 (App Router), React 19, TailwindCSS, Zustand.
+- **Backend**: FastAPI, AsyncPG, Celery, Redis.
+- **Database**: PostgreSQL with Alembic migrations.
+- **AI/Extraction**: PyMuPDF, Tesseract OCR, LangChain integrations.
 
-## Quick Start 🚀
+## Roadmap (The 100k Star Journey)
 
-Get the entire backend running in under 5 minutes.
+We are building the definitive open-source career copilot. Here is our roadmap:
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/networkforge.git
-cd networkforge
-
-# 2. Setup your environment
-cp .env.example .env
-
-# 3. Add your OpenAI API key to .env
-# OPENAI_API_KEY=sk-...
-
-# 4. Spin up the cluster
-make dev
-```
-*Note: This starts FastAPI, Celery, PostgreSQL, Redis, and Redis-Commander locally.*
-
-## API Usage
-
-**1. Start an Analysis**
-```bash
-curl -X POST http://localhost:8000/api/v1/analysis \
-  -H "Content-Type: application/json" \
-  -d '{
-    "cv_text": "Experienced Python developer with 5 years in FastAPI, PostgreSQL, and AWS...",
-    "jd_text": "Looking for a Senior Backend Engineer proficient in Python, AsyncIO, and Redis...",
-    "company": "Stripe",
-    "recruiter_name": "Elif Şahin"
-  }'
-```
-*Returns `HTTP 202` with an `analysis_id`.*
-
-**2. Check Progress via WebSocket**
-```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/analysis/<analysis_id>');
-ws.onmessage = (event) => console.log(JSON.parse(event.data));
-```
-
-**3. Retrieve Final Results**
-```bash
-curl http://localhost:8000/api/v1/analysis/<analysis_id>
-```
-
-## Configuration
-
-| Variable | Description |
-| :--- | :--- |
-| `DATABASE_URL` | PostgreSQL connection string. Default: `postgresql://postgres:postgres@postgres:5432/networkforge` |
-| `REDIS_URL` | Redis connection string. Default: `redis://redis:6379/0` |
-| `OPENAI_API_KEY` | Primary LLM key. Highly recommended for structured output speed. |
-| `OLLAMA_BASE_URL` | URL to local Ollama instance (fallback). Default: `http://localhost:11434` |
-| `TELEGRAM_BOT_TOKEN` | Required if you want push notifications to your mobile device. |
+- [x] **Milestone 1**: Core semantic matching and outreach generation.
+- [x] **Milestone 2**: Secure, local-first Docker architecture with Chrome Extension support.
+- [ ] **Milestone 3**: Export capabilities (PDF/Docx) and editable analysis drafts.
+- [ ] **Milestone 4**: Automated ATS formatting optimizations.
+- [ ] **Milestone 5**: Hosted one-click deployment templates (Vercel/Railway).
 
 ## Contributing
 
-We move fast and value ruthless pragmatism over perfection.
+We welcome contributions from the community! Please read our [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+## Security
 
-Ensure your code passes tests (`make test`) and linting (`ruff check .`) before submitting.
-
-## Roadmap
-
-- [ ] Chrome extension integration for 1-click execution on LinkedIn profiles
-- [ ] Email outreach formatting mode
-- [ ] Direct ATS score checker integration
-- [ ] Multi-language support for international outreach
+If you discover a security vulnerability, please review our [SECURITY.md](./SECURITY.md) and report it privately.
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
