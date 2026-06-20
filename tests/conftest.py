@@ -19,7 +19,9 @@ class MockConnection:
     async def fetchval(self, *args, **kwargs):
         return ANALYSIS_ID
 
-    async def fetchrow(self, *args, **kwargs):
+    async def fetchrow(self, query, *args, **kwargs):
+        if "api_keys" in query:
+            return None
         return {
             "id": ANALYSIS_ID,
             "user_id": USER_ID,

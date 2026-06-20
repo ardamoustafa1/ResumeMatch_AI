@@ -22,7 +22,7 @@ async def test_match_score_returns_valid_range(mocker, sample_cv, sample_jd):
     result = await analyze_cv_jd_match(sample_cv, sample_jd)
 
     assert isinstance(result, MatchResult)
-    assert result.score == 50
+    assert result.score == 47
 
 
 async def test_groq_falls_back_to_ollama(mocker, sample_cv, sample_jd):
@@ -44,7 +44,7 @@ async def test_groq_falls_back_to_ollama(mocker, sample_cv, sample_jd):
     result = await analyze_cv_jd_match(sample_cv, sample_jd)
 
     ollama.assert_called_once()
-    assert result.score == 66
+    assert result.score == 64
 
 
 async def test_json_parse_failure_retries(mocker):

@@ -15,6 +15,11 @@ class AuthConnection:
     def __init__(self):
         self.executed: list[tuple] = []
 
+    import contextlib
+    @contextlib.asynccontextmanager
+    async def transaction(self):
+        yield
+
     async def fetchrow(self, query, *args):
         if "SELECT id FROM users" in query:
             return None
