@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, Lock, Sparkles, Target, Extension, Layers } from "lucide-react"
+import { ArrowRight, Lock, Sparkles, Target, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function Home() {
@@ -20,7 +20,7 @@ export default function Home() {
               Sign in
             </Link>
             <Button asChild className="rounded-full bg-white text-black hover:bg-zinc-200">
-              <Link href="/register">Get Started</Link>
+              <Link href="/login">Get Started</Link>
             </Button>
           </div>
         </div>
@@ -49,7 +49,7 @@ export default function Home() {
                 size="lg"
                 className="h-12 w-full rounded-full bg-white px-8 text-base text-black hover:bg-zinc-200 sm:w-auto"
               >
-                <Link href="/register">
+                <Link href="/login">
                   Start Analyzing Now <ArrowRight className="ml-2 size-4" />
                 </Link>
               </Button>

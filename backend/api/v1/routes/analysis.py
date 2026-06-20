@@ -63,6 +63,21 @@ async def start_analysis(
         )
 
 
+@router.get("/export")
+async def export_analyses(
+    current_user: dict = Depends(get_current_user),
+    conn: Connection = Depends(get_db),
+):
+    """Export all analysis data for GDPR/Data Portability compliance."""
+    records = await get_user_analyses(
+        conn,
+        str(current_user["id"]),
+        limit=1000,
+        offset=0,
+    )
+    return {"data": records}
+
+
 @router.get("")
 async def list_analyses(
     limit: int = Query(default=20, ge=1, le=100),
