@@ -1,9 +1,10 @@
 import logging
 
 from asyncpg import Connection
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, Security
+from uuid import UUID
 
-from backend.api.deps import get_current_user
+from backend.api.deps import get_current_user, Scope
 from backend.core.rate_limit import limiter
 from backend.db.connection import get_db
 from backend.db.queries import (
@@ -14,7 +15,6 @@ from backend.db.queries import (
 )
 from backend.models.schemas import AnalysisRequest, AnalysisResponse
 from backend.tasks.analysis_tasks import run_analysis_task
-from uuid import UUID
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -65,7 +65,7 @@ async def demo_analysis():
 async def start_analysis(
     request: Request,
     payload: AnalysisRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Security(get_current_user, scopes=[]),
     conn: Connection = Depends(get_db),
 ):
     try:
@@ -103,39 +103,13 @@ async def start_analysis(
         )
 
 
-@router.get("/export")
-async def export_analyses(
-    current_user: dict = Depends(get_current_user),
-    conn: Connection = Depends(get_db),
-):
-    """Export all analysis data for GDPR/Data Portability compliance."""
-    rows = await conn.fetch(
-        """
-        SELECT id, user_id, cv_text, jd_text, company, recruiter_name, status, result, created_at
-        FROM analyses
-        WHERE user_id = $1::uuid
-        ORDER BY created_at DESC
-        """,
-        str(current_user["id"]),
-    )
-
-    import json
-
-    records = []
-    for row in rows:
-        record = dict(row)
-        if record.get("result") and isinstance(record["result"], str):
-            record["result"] = json.loads(record["result"])
-        records.append(record)
-
-    return {"data": records}
 
 
 @router.get("")
 async def list_analyses(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Security(get_current_user, scopes=[Scope.EXTENSION]),
     conn: Connection = Depends(get_db),
 ):
     return {
@@ -153,7 +127,7 @@ async def list_analyses(
 @router.get("/{analysis_id}")
 async def get_analysis_status(
     analysis_id: UUID,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Security(get_current_user, scopes=[Scope.EXTENSION]),
     conn: Connection = Depends(get_db),
 ):
     analysis_id_str = str(analysis_id)
@@ -201,9 +175,9 @@ async def get_analysis_status(
 
 
 @router.delete("/{analysis_id}")
-async def delete_analysis_endpoint(
-    analysis_id: UUID,
-    current_user: dict = Depends(get_current_user),
+async def delete_analysis(
+    analysis_id: str,
+    current_user: dict = Security(get_current_user, scopes=[]),
     conn: Connection = Depends(get_db),
 ):
 
