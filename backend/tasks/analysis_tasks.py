@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import uuid
 
 from celery.signals import worker_process_init, worker_process_shutdown
 
@@ -65,14 +66,16 @@ async def _process_analysis(analysis_id: str) -> None:
             return
 
         # Use Redis distributed lock to prevent concurrent workers processing same analysis
+        # We use a unique lock_token to ensure we only release our own lock
+        lock_token = str(uuid.uuid4())
         lock_key = f"lock:analysis:{analysis_id}"
-        acquired = await async_redis_client.set(lock_key, "1", nx=True, ex=300)
+        acquired = await async_redis_client.set(lock_key, lock_token, nx=True, ex=300)
         if not acquired:
             logger.info(
                 "Analysis %s is already being processed by another worker; skipping.",
                 analysis_id,
             )
-            return
+            raise RuntimeError(f"Lock could not be acquired for analysis {analysis_id}")
 
         publish_progress_sync(analysis_id, "validating", 10)
         await update_analysis_result(conn, analysis_id, "processing")
@@ -85,68 +88,71 @@ async def _process_analysis(analysis_id: str) -> None:
         )
         user_id = record["user_id"]
 
-    # Phase 2: LLM Operations (without holding DB connection)
-    result = FullAnalysisResult()
-
-    publish_progress_sync(analysis_id, "analyzing_match", 30)
-    result.match_result = await analyze_cv_jd_match(
-        request.cv_text,
-        request.jd_text,
-    )
-
-    publish_progress_sync(analysis_id, "generating_messages", 60)
     try:
-        result.outreach_messages = await generate_outreach_messages(
-            request.cv_text,
-            request.jd_text,
-            request.company or "the company",
-            request.recruiter_name or "the recruiter",
-            result.match_result,
-        )
-    except Exception:
-        logger.exception("Outreach generation failed for %s", analysis_id)
-        result.errors["outreach_messages"] = "Outreach messages could not be generated."
+        # Phase 2: LLM Operations (without holding DB connection)
+        result = FullAnalysisResult()
 
-    publish_progress_sync(analysis_id, "improving_profile", 85)
-    try:
-        result.profile_improvements = await generate_profile_improvements(
+        publish_progress_sync(analysis_id, "analyzing_match", 30)
+        result.match_result = await analyze_cv_jd_match(
             request.cv_text,
             request.jd_text,
         )
-    except Exception:
-        logger.exception("Profile generation failed for %s", analysis_id)
-        result.errors["profile_improvements"] = (
-            "Profile improvements could not be generated."
-        )
 
-    final_data = result.model_dump()
-    final_status = "partial_completed" if result.errors else "completed"
+        publish_progress_sync(analysis_id, "generating_messages", 60)
+        try:
+            result.outreach_messages = await generate_outreach_messages(
+                request.cv_text,
+                request.jd_text,
+                request.company or "the company",
+                request.recruiter_name or "the recruiter",
+                result.match_result,
+            )
+        except Exception:
+            logger.exception("Outreach generation failed for %s", analysis_id)
+            result.errors["outreach_messages"] = "Outreach messages could not be generated."
 
-    # Phase 3: Save Results
-    async with db_pool.pool.acquire() as conn:
-        await update_analysis_result(conn, analysis_id, final_status, final_data)
-        publish_progress_sync(
-            analysis_id,
-            final_status,
-            100,
-            data=final_data,
-        )
+        publish_progress_sync(analysis_id, "improving_profile", 85)
+        try:
+            result.profile_improvements = await generate_profile_improvements(
+                request.cv_text,
+                request.jd_text,
+            )
+        except Exception:
+            logger.exception("Profile generation failed for %s", analysis_id)
+            result.errors["profile_improvements"] = (
+                "Profile improvements could not be generated."
+            )
 
-        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-        if bot_token:
-            telegram_config = await get_telegram_config(conn, user_id)
-            if telegram_config and telegram_config.get("chat_id"):
-                await send_analysis_complete(
-                    chat_id=telegram_config["chat_id"],
-                    bot_token=bot_token,
-                    analysis_id=analysis_id,
-                    company=request.company or "Not specified",
-                    recruiter_name=request.recruiter_name or "Not specified",
-                    result=result,
-                )
+        final_data = result.model_dump()
+        final_status = "partial_completed" if result.errors else "completed"
 
-    # Release the lock after saving
-    await async_redis_client.delete(f"lock:analysis:{analysis_id}")
+        # Phase 3: Save Results
+        async with db_pool.pool.acquire() as conn:
+            await update_analysis_result(conn, analysis_id, final_status, final_data)
+            publish_progress_sync(
+                analysis_id,
+                final_status,
+                100,
+                data=final_data,
+            )
+
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+            if bot_token:
+                telegram_config = await get_telegram_config(conn, user_id)
+                if telegram_config and telegram_config.get("chat_id"):
+                    await send_analysis_complete(
+                        chat_id=telegram_config["chat_id"],
+                        bot_token=bot_token,
+                        analysis_id=analysis_id,
+                        company=request.company or "Not specified",
+                        recruiter_name=request.recruiter_name or "Not specified",
+                        result=result,
+                    )
+    finally:
+        # Release the lock after saving, but only if we still own it
+        current_lock = await async_redis_client.get(lock_key)
+        if current_lock == lock_token:
+            await async_redis_client.delete(lock_key)
 
 
 async def _mark_analysis_failed(analysis_id: str, error: Exception) -> None:

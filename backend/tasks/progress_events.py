@@ -15,16 +15,15 @@ STEP_MESSAGES = {
     "generating_messages": "Writing personalized outreach messages",
     "improving_profile": "Preparing profile improvements",
     "done": "Analysis completed",
+    "completed": "Analysis completed",
     "partial_completed": "Analysis completed with partial results",
     "failed": "Analysis failed",
 }
 
 
 def _event_name(step: str) -> str:
-    if step == "done":
+    if step in {"completed", "done", "partial_completed"}:
         return "completed"
-    if step == "partial_completed":
-        return "partial_completed"
     if step == "failed":
         return "failed"
     return "progress"

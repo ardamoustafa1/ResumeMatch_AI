@@ -38,7 +38,9 @@ async def readiness(
         logger.exception("Database readiness check failed")
 
     try:
-        await async_redis_client.ping()
+        res = async_redis_client.ping()
+        if hasattr(res, "__await__"):
+            await res
         health_status["redis"] = "up"
     except Exception:
         logger.exception("Redis readiness check failed")

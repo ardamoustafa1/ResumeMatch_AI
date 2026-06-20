@@ -16,6 +16,7 @@ pytestmark = pytest.mark.asyncio
 class FakeConnection:
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
 
@@ -50,9 +51,18 @@ def task_mocks(mocker):
         return_value=True,
     )
     mocker.patch(
+        "backend.tasks.analysis_tasks.async_redis_client.get",
+        new_callable=AsyncMock,
+        return_value="mock_token", # In a real test this should match lock_token
+    )
+    mocker.patch(
         "backend.tasks.analysis_tasks.async_redis_client.delete",
         new_callable=AsyncMock,
-        return_value=True,
+        return_value=1,
+    )
+    mocker.patch(
+        "backend.tasks.analysis_tasks.uuid.uuid4",
+        return_value="mock_token",
     )
     update = mocker.patch("backend.tasks.analysis_tasks.update_analysis_result")
     mocker.patch(
@@ -139,42 +149,46 @@ async def test_match_failure_propagates(mocker, task_mocks):
 
 async def test_purge_old_data_task(mocker):
     from backend.tasks.analysis_tasks import purge_old_data_task
-    
+
     # Mock db_pool to avoid actual connection
-    mocker.patch("backend.tasks.analysis_tasks.db_pool.connect", new_callable=mocker.AsyncMock)
-    
+    mocker.patch(
+        "backend.tasks.analysis_tasks.db_pool.connect", new_callable=mocker.AsyncMock
+    )
+
     pool_mock = mocker.MagicMock()
     acquire_ctx = mocker.AsyncMock()
-    
+
     class FakeConn:
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
+
         async def execute(self, *args, **kwargs):
             return "DELETE 5"
-            
+
     acquire_ctx.__aenter__.return_value = FakeConn()
     pool_mock.acquire.return_value = acquire_ctx
-    
+
     mocker.patch("backend.tasks.analysis_tasks.db_pool.pool", pool_mock)
-    
+
     # Execute the synchronous celery task, which runs the async _purge internally
     # But since it calls asyncio.run(), we must be careful with event loops.
     captured_coro = None
+
     def mock_run(coro):
         nonlocal captured_coro
         captured_coro = coro
-        
+
     mocker.patch("backend.tasks.analysis_tasks._run", side_effect=mock_run)
-    
+
     # Run the synchronous function which will pass the coroutine to our mock
     if hasattr(purge_old_data_task, "__wrapped__"):
         purge_old_data_task.__wrapped__()
     else:
         purge_old_data_task()
-        
+
     # Now await the captured coroutine inside the pytest-asyncio event loop
     assert captured_coro is not None
     await captured_coro
-
