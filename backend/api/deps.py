@@ -9,6 +9,8 @@ from backend.core.security import ALGORITHM, SECRET_KEY, hash_token
 from datetime import datetime, timezone
 from fastapi import BackgroundTasks
 import enum
+from fastapi.security import SecurityScopes
+from backend.core.context import user_id_var
 
 
 class Scope(str, enum.Enum):
@@ -25,6 +27,7 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 
 async def get_current_user(
+    security_scopes: SecurityScopes,
     request: Request,
     background_tasks: BackgroundTasks,
     conn: Connection = Depends(get_db),
@@ -77,24 +80,28 @@ async def get_current_user(
         user["id"] = api_key_record[
             "user_id"
         ]  # Fix id mapping because user id and key id overlap
-        if Scope.EXTENSION in user.get("scopes", []):
-            if request.url.path == "/api/v1/analysis/export":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="API key does not have sufficient permissions for this action",
-                )
-            allowed_paths = ["/api/v1/analysis", "/api/v1/extract-text"]
-            is_allowed = any(request.url.path.startswith(p) for p in allowed_paths)
-            if not is_allowed or request.method == "DELETE":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="API key does not have sufficient permissions for this action",
-                )
+        user["auth_type"] = "api_key"
+        
+        if security_scopes.scopes:
+            for scope in security_scopes.scopes:
+                if scope not in user.get("scopes", []):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="API key does not have sufficient permissions for this action",
+                    )
+        else:
+            # Deny API keys by default on endpoints that don't declare required scopes
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key does not have sufficient permissions for this action",
+            )
 
         # Schedule async update of usage metadata
         user_agent = request.headers.get("user-agent", "unknown")
 
         async def update_usage(key_id: str, ua: str):
+            if db_pool.pool is None:
+                return
             async with db_pool.pool.acquire() as update_conn:
                 await update_conn.execute(
                     "UPDATE api_keys SET last_used_at = $1, device_info = $2 WHERE id = $3",
@@ -115,4 +122,5 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive",
         )
+    user_id_var.set(str(user["id"]))
     return dict(user)
