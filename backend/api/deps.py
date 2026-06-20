@@ -62,6 +62,14 @@ async def get_current_user(
         if api_key_record["revoked_at"] is not None or (api_key_record["expires_at"] and api_key_record["expires_at"] <= now):
             raise credentials_exception
         user = dict(api_key_record)
+        if user.get("scopes") == "extension":
+            allowed_paths = ["/api/v1/analysis", "/api/v1/extract/linkedin"]
+            is_allowed = any(request.url.path.startswith(p) for p in allowed_paths)
+            if not is_allowed or request.method == "DELETE":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="API key does not have sufficient permissions for this action",
+                )
     if not user["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

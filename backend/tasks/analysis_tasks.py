@@ -52,73 +52,77 @@ async def _process_analysis(analysis_id: str) -> None:
     """Run an idempotent analysis attempt and persist a complete or partial result."""
     if db_pool.pool is None:
         raise RuntimeError("DB pool not initialized in Celery worker.")
+        
+    # Phase 1: Fetch and Lock
     async with db_pool.pool.acquire() as conn:
         record = await get_analysis(conn, analysis_id)
         if not record:
             raise LookupError(f"Analysis {analysis_id} does not exist.")
         if record["status"] in {"completed", "partial_completed"}:
-            logger.info(
-                "Analysis %s is already complete; skipping duplicate task.",
-                analysis_id,
-            )
+            logger.info("Analysis %s is already complete; skipping duplicate task.", analysis_id)
             return
-
+            
+        # Optional: Lock by setting to 'processing' and checking if it was already processing
+        # Since it's idempotency, if it is processing we just update it anyway.
         publish_progress_sync(analysis_id, "validating", 10)
         await update_analysis_result(conn, analysis_id, "processing")
+        
         request = AnalysisRequest(
             cv_text=record["cv_text"],
             jd_text=record["jd_text"],
             company=record.get("company"),
             recruiter_name=record.get("recruiter_name"),
         )
-        result = FullAnalysisResult()
+        user_id = record["user_id"]
 
-        publish_progress_sync(analysis_id, "analyzing_match", 30)
-        result.match_result = await analyze_cv_jd_match(
+    # Phase 2: LLM Operations (without holding DB connection)
+    result = FullAnalysisResult()
+
+    publish_progress_sync(analysis_id, "analyzing_match", 30)
+    result.match_result = await analyze_cv_jd_match(
+        request.cv_text,
+        request.jd_text,
+    )
+
+    publish_progress_sync(analysis_id, "generating_messages", 60)
+    try:
+        result.outreach_messages = await generate_outreach_messages(
+            request.cv_text,
+            request.jd_text,
+            request.company or "the company",
+            request.recruiter_name or "the recruiter",
+            result.match_result,
+        )
+    except Exception:
+        logger.exception("Outreach generation failed for %s", analysis_id)
+        result.errors["outreach_messages"] = "Outreach messages could not be generated."
+
+    publish_progress_sync(analysis_id, "improving_profile", 85)
+    try:
+        result.profile_improvements = await generate_profile_improvements(
             request.cv_text,
             request.jd_text,
         )
+    except Exception:
+        logger.exception("Profile generation failed for %s", analysis_id)
+        result.errors["profile_improvements"] = "Profile improvements could not be generated."
 
-        publish_progress_sync(analysis_id, "generating_messages", 60)
-        try:
-            result.outreach_messages = await generate_outreach_messages(
-                request.cv_text,
-                request.jd_text,
-                request.company or "the company",
-                request.recruiter_name or "the recruiter",
-                result.match_result,
-            )
-        except Exception:
-            logger.exception("Outreach generation failed for %s", analysis_id)
-            result.errors["outreach_messages"] = (
-                "Outreach messages could not be generated."
-            )
-
-        publish_progress_sync(analysis_id, "improving_profile", 85)
-        try:
-            result.profile_improvements = await generate_profile_improvements(
-                request.cv_text,
-                request.jd_text,
-            )
-        except Exception:
-            logger.exception("Profile generation failed for %s", analysis_id)
-            result.errors["profile_improvements"] = (
-                "Profile improvements could not be generated."
-            )
-
-        final_data = result.model_dump()
-        final_status = "partial_completed" if result.errors else "completed"
+    final_data = result.model_dump()
+    final_status = "partial_completed" if result.errors else "completed"
+    
+    # Phase 3: Save Results
+    async with db_pool.pool.acquire() as conn:
         await update_analysis_result(conn, analysis_id, final_status, final_data)
         publish_progress_sync(
             analysis_id,
-            "partial_completed" if result.errors else "done",
+            final_status,
             100,
             data=final_data,
         )
 
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         if bot_token:
-            telegram_config = await get_telegram_config(conn, record["user_id"])
+            telegram_config = await get_telegram_config(conn, user_id)
             if telegram_config and telegram_config.get("chat_id"):
                 await send_analysis_complete(
                     chat_id=telegram_config["chat_id"],
