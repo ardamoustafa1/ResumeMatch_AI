@@ -1,7 +1,7 @@
-# Threat Model - NetworkForge
+# Threat Model - ResumeMatch AI
 
 ## 1. System Description
-NetworkForge is a web platform for analyzing CVs against Job Descriptions using AI.
+ResumeMatch AI is a web platform for analyzing CVs against Job Descriptions using AI.
 - **Frontend**: Next.js, deployed on Vercel/similar.
 - **Backend**: FastAPI (Python), deployed via Docker Compose.
 - **Database**: PostgreSQL (relational data, user accounts, analysis results).
