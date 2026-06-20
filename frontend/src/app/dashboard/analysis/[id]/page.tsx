@@ -20,6 +20,26 @@ export default function AnalysisDetailPage() {
 
   useEffect(() => {
     if (!id) return
+    
+    if (id === "demo") {
+      apiFetch<any>("/analysis/demo", { method: "POST" })
+        .then((data) => {
+          setRecord({
+            id: data.analysis_id,
+            user_id: "demo",
+            cv_text: "",
+            jd_text: "",
+            company: "Demo Mode - Stripe",
+            recruiter_name: "Jane",
+            status: "completed",
+            result: data.result,
+            created_at: new Date().toISOString()
+          })
+        })
+        .finally(() => setLoading(false))
+      return
+    }
+
     apiFetch<AnalysisRecord>(`/analysis/${id}`)
       .then((data) => {
         setRecord(data)

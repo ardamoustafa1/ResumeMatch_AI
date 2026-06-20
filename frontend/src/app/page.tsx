@@ -59,7 +59,7 @@ export default function Home() {
                 size="lg"
                 className="h-12 w-full rounded-full border-white/20 bg-transparent px-8 text-base text-white hover:bg-white/10 sm:w-auto"
               >
-                <Link href="#features">View Demo</Link>
+                <Link href="/dashboard/analysis/demo">View Demo</Link>
               </Button>
             </div>
           </div>

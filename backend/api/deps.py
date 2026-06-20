@@ -6,7 +6,6 @@ from pydantic import ValidationError
 
 from backend.db.connection import get_db
 from backend.core.security import ALGORITHM, SECRET_KEY, hash_token
-from backend.models.schemas import TokenData
 from datetime import datetime, timezone
 
 oauth2_scheme = OAuth2PasswordBearer(

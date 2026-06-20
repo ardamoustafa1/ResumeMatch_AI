@@ -8,7 +8,6 @@ from backend.core.rate_limit import limiter
 from backend.db.connection import get_db
 from backend.db.queries import (
     create_analysis,
-    delete_analysis,
     get_analysis,
     get_user_analyses,
     update_analysis_result,
@@ -19,6 +18,39 @@ from backend.tasks.analysis_tasks import run_analysis_task
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+@router.post("/demo")
+async def demo_analysis():
+    import uuid
+    from datetime import datetime, timezone
+    
+    mock_id = str(uuid.uuid4())
+    mock_data = {
+        "analysis_id": mock_id,
+        "status": "completed",
+        "result": {
+            "match_result": {
+                "score": 92,
+                "matched_skills": ["React", "FastAPI", "PostgreSQL", "Docker", "TypeScript"],
+                "missing_skills": ["GraphQL", "Kubernetes"],
+                "improvement_suggestions": [
+                    "Highlight your REST API design experience",
+                    "Add metrics on how your Dockerization improved build times"
+                ]
+            },
+            "outreach_messages": {
+                "dm_first_contact": "Hi! I noticed your team is building a scalable career copilot. My background in Next.js and FastAPI directly aligns with the stack mentioned in the job description.",
+                "dm_follow_up": "Just floating this up! Let me know if you have 5 minutes this week.",
+                "connection_note": "Hi! I'm an engineer specializing in React & FastAPI, would love to connect and discuss the open backend role."
+            },
+            "profile_improvements": {
+                "headline_before": "Software Developer",
+                "headline_after": "Senior Full-Stack Engineer | React & Python | Building Scalable SaaS",
+                "about_section": "I build robust, local-first applications using Next.js and FastAPI. My focus is on deterministic outcomes and secure architectures."
+            },
+            "errors": {}
+        }
+    }
+    return mock_data
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("5/minute")

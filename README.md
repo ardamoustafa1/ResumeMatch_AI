@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/ardamoustafa1/NetworkForge/main/frontend/public/icon.svg" alt="ResumeMatch AI Logo" width="120" />
+  <img src="https://raw.githubusercontent.com/ardamoustafa1/NetworkForge/main/frontend/src/app/favicon.ico" alt="ResumeMatch AI Logo" width="120" />
   <h1>ResumeMatch AI</h1>
   <p>The Private, Local-First Career Copilot for Top Performers.</p>
 
@@ -18,13 +18,13 @@
 
 ## What is ResumeMatch AI?
 
-ResumeMatch AI is not a generic ChatGPT wrapper. It is a highly engineered, privacy-obsessed system designed to ingest your professional CV alongside target job descriptions, calculate an exact semantic match score, identify missing technical skills, and draft hyper-personalized LinkedIn outreach messages.
+ResumeMatch AI is not a generic ChatGPT wrapper. It is a highly engineered, privacy-obsessed system designed to ingest your professional CV alongside target job descriptions, calculate a deterministic mathematical match score, identify missing technical skills, and draft hyper-personalized LinkedIn outreach messages.
 
-**Your data stays yours.** With our local-first Docker architecture, your PII is never permanently stored on third-party servers.
+**Your data stays yours.** With our local-first Docker architecture and 30-day retention policies, your PII is never permanently stored on third-party servers.
 
 ## Features
 
-- **Deep Semantic Matching**: Calculates a deterministic percentage match between your CV and the role.
+- **Deterministic Semantic Matching**: We use AI for extraction but purely mathematical logic for calculating the exact percentage match between your CV and the role, avoiding LLM hallucinations.
 - **Actionable Gap Analysis**: Highlights exact keywords and tools missing from your CV that the ATS is looking for.
 - **Outreach Draft Generation**: Automatically writes initial connection notes and 7-day follow-ups for hiring managers.
 - **Chrome Extension Integration**: Generates API keys to securely analyze job postings directly from your LinkedIn tab.
@@ -66,7 +66,7 @@ Zero friction onboarding. Get the entire stack running locally in under 5 minute
 
 We use a modern, highly scalable microservices architecture:
 
-- **Frontend**: Next.js 15 (App Router), React 19, TailwindCSS, Zustand.
+- **Frontend**: Next.js 16 (App Router), React 19, TailwindCSS, Zustand.
 - **Backend**: FastAPI, AsyncPG, Celery, Redis.
 - **Database**: PostgreSQL with Alembic migrations.
 - **AI/Extraction**: PyMuPDF, Tesseract OCR, LangChain integrations.

@@ -3,9 +3,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status, Depends
-from jose import JWTError, jwt
 
-from backend.core.security import ALGORITHM, SECRET_KEY
 from backend.core.config import settings
 from backend.core.websocket_manager import ws_manager
 from backend.db.connection import db_pool
