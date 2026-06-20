@@ -64,7 +64,7 @@ async function handleMatchClick() {
       throw new Error('Job description not found. LinkedIn layout might have changed.');
     }
 
-    const { apiToken, cvText } = await chrome.storage.session.get([
+    const { apiToken, cvText } = await chrome.storage.local.get([
       'apiToken',
       'cvText'
     ]);

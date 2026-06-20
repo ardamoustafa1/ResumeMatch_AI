@@ -1,12 +1,11 @@
-// Allow content scripts to access session storage
-chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS' });
+
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== 'START_ANALYSIS') return false;
 
   (async () => {
     try {
-      const { apiToken, apiBaseUrl } = await chrome.storage.session.get([
+      const { apiToken, apiBaseUrl } = await chrome.storage.local.get([
         'apiToken',
         'apiBaseUrl'
       ]);
