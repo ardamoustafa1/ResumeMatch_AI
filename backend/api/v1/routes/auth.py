@@ -230,7 +230,7 @@ async def refresh_access_token(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid refresh token",
             )
-            
+
         if record["revoked_at"] is not None:
             # Token family reuse detection: a revoked token was presented.
             # Assume token theft and revoke ALL refresh tokens for this user.
@@ -303,9 +303,55 @@ async def delete_users_me(
 ) -> Response:
     """Delete the current user account and all associated data."""
     # The database schema has ON DELETE CASCADE for users -> analyses, api_keys, refresh_tokens, etc.
-    await conn.execute("DELETE FROM users WHERE id = $1", current_user["id"])
+    await conn.execute("DELETE FROM users WHERE id = $1::uuid", current_user["id"])
     _clear_auth_cookies(response)
+    response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@router.get("/export")
+@limiter.limit("2/hour")
+async def export_user_data(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    conn: Connection = Depends(get_db),
+) -> Any:
+    """Export all user data in JSON format."""
+    # Fetch all analyses and their results
+    analyses = await conn.fetch(
+        "SELECT id, cv_text, jd_text, company, recruiter_name, status, result, created_at FROM analyses WHERE user_id = $1",
+        current_user["id"]
+    )
+    
+    # Fetch all api keys
+    api_keys = await conn.fetch(
+        "SELECT id, name, prefix, scopes, created_at, last_used_at, device_info FROM api_keys WHERE user_id = $1",
+        current_user["id"]
+    )
+    
+    export_data = {
+        "user": {
+            "id": str(current_user["id"]),
+            "email": current_user["email"],
+            "created_at": current_user["created_at"].isoformat() if current_user.get("created_at") else None,
+        },
+        "analyses": [dict(a) for a in analyses],
+        "api_keys": [dict(k) for k in api_keys],
+        "exported_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Convert uuids and datetimes to string for JSON serialization
+    def convert_serializable(obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        import uuid
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        return obj
+
+    import json
+    json_str = json.dumps(export_data, default=convert_serializable)
+    return Response(content=json_str, media_type="application/json")
 
 
 @router.post("/verify-email")
