@@ -394,15 +394,13 @@ export default function DashboardPage() {
                         {item.status.replace("_", " ")}
                       </span>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <button
-                            className="text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
-                            title="Delete"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-zinc-950 border-zinc-800">
+                      <AlertDialogTrigger
+                        className="text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-zinc-950 border-zinc-800">
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription className="text-zinc-400">

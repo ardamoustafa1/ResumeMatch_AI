@@ -161,9 +161,8 @@ export default function Home() {
           <p>© {new Date().getFullYear()} ResumeMatch AI. All rights reserved.</p>
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
             <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
-            <Link href="/terms" className="hover:text-white transition">Terms</Link>
-            <Link href="/dpa" className="hover:text-white transition">DPA</Link>
-            <a href="mailto:security@networkforge.ai" className="hover:text-white transition">Security Contact</a>
+            <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>
+            <a href="mailto:security@resumematch.ai" className="hover:text-white transition">Security Contact</a>
           </div>
         </div>
       </footer>
