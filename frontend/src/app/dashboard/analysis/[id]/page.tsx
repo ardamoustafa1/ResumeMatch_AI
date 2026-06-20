@@ -34,6 +34,10 @@ export default function AnalysisDetailPage() {
             created_at: new Date().toISOString()
           })
         })
+        .catch((err) => {
+          toast.error("Demo analysis failed to load. The backend might be unreachable.")
+          router.replace("/")
+        })
         .finally(() => setLoading(false))
       return
     }

@@ -12,14 +12,21 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from backend.api.v1 import websocket
-from backend.api.v1.routes import analysis, auth, extract, health, telegram
+from backend.api.v1.routes import analysis, auth, extract, health, telegram, metrics
 from backend.core.config import settings
 from backend.core.rate_limit import limiter
 from backend.db.connection import db_pool
 from backend.tasks.progress_events import async_redis_client
 
+from backend.core.context import request_id_var, user_id_var
+
 logger.remove()
-logger.add(sys.stderr, format="{time} {level} {message}", level="INFO")
+def log_filter(record):
+    record["extra"]["request_id"] = request_id_var.get()
+    record["extra"]["user_id"] = user_id_var.get()
+    return True
+
+logger.add(sys.stderr, format="{time} {level} [Req={extra[request_id]} User={extra[user_id]}] {message}", level="INFO", filter=log_filter)
 
 
 def strip_sensitive_data(event, hint):
@@ -55,7 +62,9 @@ async def lifespan(app: FastAPI):
     settings.validate()
     logger.info("Initializing ResumeMatch AI application...")
     await db_pool.connect()
-    await async_redis_client.ping()
+    res = async_redis_client.ping()
+    if hasattr(res, "__await__"):
+        await res
     logger.info("ResumeMatch AI API is ready to receive traffic.")
     yield
     logger.info("Shutting down ResumeMatch AI application...")
@@ -71,7 +80,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler) # type: ignore[arg-type]
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 app.add_middleware(
     CORSMiddleware,
@@ -114,6 +123,7 @@ async def add_request_id(request: Request, call_next):
                     "request_id": request_id,
                 },
             )
+    request_id_var.set(request_id)
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response
@@ -143,6 +153,7 @@ app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["Analysis"]
 app.include_router(extract.router, prefix="/api/v1/extract-text", tags=["Extraction"])
 app.include_router(telegram.router, prefix="/api/v1/telegram", tags=["Telegram"])
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSockets"])
+app.include_router(metrics.router, prefix="/metrics", tags=["Metrics"])
 
 
 @app.get("/")

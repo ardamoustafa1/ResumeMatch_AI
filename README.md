@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/ardamoustafa1/NetworkForge/main/frontend/src/app/favicon.ico" alt="ResumeMatch AI Logo" width="120" />
+  <img src="https://raw.githubusercontent.com/ardamoustafa1/ResumeMatch_AI/main/frontend/src/app/favicon.ico" alt="ResumeMatch AI Logo" width="120" />
   <h1>ResumeMatch AI</h1>
   <p>The Private, Local-First Career Copilot for Top Performers.</p>
 
-  [![CI](https://github.com/ardamoustafa1/NetworkForge/actions/workflows/ci.yml/badge.svg)](https://github.com/ardamoustafa1/NetworkForge/actions/workflows/ci.yml)
+  [![CI](https://github.com/ardamoustafa1/ResumeMatch_AI/actions/workflows/ci.yml/badge.svg)](https://github.com/ardamoustafa1/ResumeMatch_AI/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
   <p>
@@ -20,7 +20,7 @@
 
 ResumeMatch AI is not a generic ChatGPT wrapper. It is a highly engineered, privacy-obsessed system designed to ingest your professional CV alongside target job descriptions, calculate a deterministic mathematical match score, identify missing technical skills, and draft hyper-personalized LinkedIn outreach messages.
 
-**Your data stays yours.** With our local-first Docker architecture and 30-day retention policies, your PII is never permanently stored on third-party servers.
+**Privacy-First By Default**: Your data is locally processed until AI analysis. We attempt to mask common PII patterns (like emails and phone numbers) before sending data to cloud AI providers (e.g. Groq). By default, uploaded data is completely purged after 30 days.
 
 ## Features
 
@@ -43,7 +43,7 @@ Zero friction onboarding. Get the entire stack running locally in under 5 minute
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/ardamoustafa1/NetworkForge.git resumematch-ai
+   git clone https://github.com/ardamoustafa1/ResumeMatch_AI.git resumematch-ai
    cd resumematch-ai
    ```
 
@@ -61,6 +61,25 @@ Zero friction onboarding. Get the entire stack running locally in under 5 minute
 4. **Access the application**
    - Frontend Dashboard: [http://localhost:3000](http://localhost:3000)
    - API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+## Production Readiness
+
+Before deploying to production, it is highly recommended to run the full suite of security, load, and integration tests to ensure your environment is hardened:
+
+```bash
+# Run Security SAST Scans
+pip install bandit pip-audit
+bandit -r backend -c backend/pyproject.toml
+pip-audit -r backend/requirements.txt
+
+# Run Playwright Accessibility (A11y) & E2E Tests
+cd frontend
+npm run test:e2e
+
+# Run Locust Load Tests
+cd tests
+locust -f load_test.py --headless -u 10 -r 2 --run-time 5s --host=http://localhost:8000
+```
 
 ## Architecture
 

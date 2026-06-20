@@ -29,9 +29,9 @@ jobs:
       - name: Install Python Security Tools
         run: pip install pip-audit bandit
       - name: Run pip-audit
-        run: pip-audit -r requirements.txt || true
+        run: pip-audit -r requirements.txt
       - name: Run Bandit (SAST)
-        run: bandit -r backend -c backend/pyproject.toml || true
+        run: bandit -r backend -c backend/pyproject.toml
   backend:
     runs-on: ubuntu-latest
     services:
@@ -92,7 +92,10 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run lint
       - run: npm test
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
       - run: npm run build
+      - run: npm run test:e2e
       - run: npm audit --omit=dev --audit-level=high
       - name: Validate extension scripts
         working-directory: ..
@@ -112,7 +115,7 @@ jobs:
         with:
           image-ref: 'resumematch_ai-api:latest'
           format: 'table'
-          exit-code: '0'
+          exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
