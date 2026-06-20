@@ -1,46 +1,38 @@
+"""Create a local development user from environment variables."""
+
 import asyncio
 import os
-import uuid
-import sys
 
-sys.path.insert(0, '/app')
+from backend.core.security import get_password_hash
+from backend.db.connection import db_pool
 
-from backend.db.connection import db_pool, DATABASE_URL
-from backend.services.telegram_service import verify_telegram_config
 
-async def main():
-    print(f"Connecting to {DATABASE_URL}...")
+async def main() -> None:
+    email = os.getenv("DEV_USER_EMAIL")
+    password = os.getenv("DEV_USER_PASSWORD")
+    if not email or not password:
+        raise SystemExit("Set DEV_USER_EMAIL and DEV_USER_PASSWORD.")
+
     await db_pool.connect(retries=1)
-    
-    chat_id = "1857022853"
-    
-    async with db_pool.pool.acquire() as conn:
-        # 1. Create a dummy user
-        user_id = str(uuid.uuid4())
-        await conn.execute("INSERT INTO users (id, email) VALUES ($1::uuid, $2)", user_id, f"test_{user_id[:8]}@example.com")
-        print(f"Created test user: {user_id}")
-        
-        # 2. Add Telegram config
-        await conn.execute("""
-            INSERT INTO telegram_configs (user_id, chat_id, is_active) 
-            VALUES ($1::uuid, $2, true)
-        """, user_id, chat_id)
-        print(f"Registered Telegram Chat ID {chat_id} for user {user_id}")
-        
-    await db_pool.disconnect()
-    
-    # 3. Test sending message
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not bot_token:
-        print("TELEGRAM_BOT_TOKEN not set in environment.")
-        return
-        
-    print("Testing Telegram message delivery...")
-    success = await verify_telegram_config(bot_token, chat_id)
-    if success:
-        print("✅ Test message sent successfully to Telegram!")
-    else:
-        print("❌ Failed to send test message.")
+    assert db_pool.pool is not None
+    try:
+        async with db_pool.pool.acquire() as connection:
+            await connection.execute(
+                """
+                INSERT INTO users (email, hashed_password, email_verified)
+                VALUES ($1, $2, TRUE)
+                ON CONFLICT (email) DO UPDATE
+                SET hashed_password = EXCLUDED.hashed_password,
+                    email_verified = TRUE,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                email.lower(),
+                get_password_hash(password),
+            )
+    finally:
+        await db_pool.disconnect()
+    print(f"Development user ready: {email.lower()}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
