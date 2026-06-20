@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ResumeMatch AI</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; width: 300px; padding: 15px; background: #09090b; color: #f4f4f5; margin: 0; }
+    h2 { font-size: 16px; margin-top: 0; color: #60a5fa; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 8px; margin-bottom: 10px; background: #18181b; border: 1px solid #3f3f46; color: white; border-radius: 4px; }
+    textarea { min-height: 110px; resize: vertical; }
+    label { display: block; margin-bottom: 4px; font-size: 12px; color: #d4d4d8; }
+    .notice { font-size: 11px; line-height: 1.45; color: #a1a1aa; margin-bottom: 12px; }
+    button { width: 100%; padding: 8px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    #status { margin-top: 10px; font-size: 12px; color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <h2>ResumeMatch Settings</h2>
+  <p class="notice">Credentials and CV text are stored only on this device. Review generated content before using it.</p>
+  <label for="apiBaseUrl">API URL:</label>
+  <input type="url" id="apiBaseUrl" placeholder="http://localhost:8000">
+  <label>API Token:</label>
+  <input type="password" id="apiToken" placeholder="eyJhbGci...">
+  <label>Your CV Text:</label>
+  <textarea id="cvText" placeholder="Paste your CV..."></textarea>
+  <button id="saveBtn">Save Settings</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
