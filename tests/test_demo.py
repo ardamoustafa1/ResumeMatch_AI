@@ -3,10 +3,11 @@ from httpx import AsyncClient
 
 pytestmark = pytest.mark.asyncio
 
+
 async def test_demo_endpoint_returns_instant_mock(client: AsyncClient):
     # Unauthenticated post request
     response = await client.post("/api/v1/analysis/demo")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "completed"

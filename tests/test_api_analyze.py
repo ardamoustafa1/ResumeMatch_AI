@@ -21,7 +21,11 @@ async def test_post_analysis_returns_job_id(client: AsyncClient, sample_cv, samp
     )
 
     assert response.status_code == 202
-    assert response.json()["analysis_id"] == ANALYSIS_ID
+    data = response.json()
+    assert "analysis_id" in data
+    # Test that the returned ID is a valid UUID
+    import uuid
+    assert uuid.UUID(data["analysis_id"])
 
 
 async def test_post_analysis_validates_input(client: AsyncClient, sample_jd):
@@ -33,75 +37,61 @@ async def test_post_analysis_validates_input(client: AsyncClient, sample_jd):
     assert response.status_code == 422
 
 
-async def test_get_pending_analysis(client: AsyncClient):
-    response = await client.get(f"/api/v1/analysis/{ANALYSIS_ID}")
+async def test_get_pending_analysis(client: AsyncClient, sample_cv, sample_jd):
+    # Create analysis first
+    post_res = await client.post(
+        "/api/v1/analysis",
+        json={"cv_text": sample_cv, "jd_text": sample_jd, "company": "TestCorp"},
+    )
+    analysis_id = post_res.json()["analysis_id"]
+    
+    response = await client.get(f"/api/v1/analysis/{analysis_id}")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "pending"
+    data = response.json()
+    assert data["status"] == "pending"
 
 
-async def test_get_completed_analysis(client: AsyncClient):
-    class CompletedConnection:
-        async def fetchrow(self, *args, **kwargs):
-            return {
-                "id": ANALYSIS_ID,
-                "user_id": USER_ID,
-                "status": "completed",
-                "result": {
-                    "match_result": {
-                        "score": 100,
-                        "matched_skills": [],
-                        "missing_skills": [],
-                        "improvement_suggestions": [],
-                    },
-                    "outreach_messages": None,
-                    "profile_improvements": None,
-                    "errors": {},
-                },
-                "created_at": datetime.now(timezone.utc),
-                "cv_text": "",
-                "jd_text": "",
-                "company": "",
-                "recruiter_name": "",
-            }
+async def test_get_completed_analysis(client: AsyncClient, sample_cv, sample_jd):
+    # Create analysis first
+    post_res = await client.post(
+        "/api/v1/analysis",
+        json={"cv_text": sample_cv, "jd_text": sample_jd, "company": "TestCorp"},
+    )
+    analysis_id = post_res.json()["analysis_id"]
 
-    async def override():
-        yield CompletedConnection()
+    # Update analysis to completed in DB
+    from backend.db.connection import db_pool
+    import json
+    mock_result = {
+        "match_result": {"score": 100, "matched_skills": [], "missing_skills": [], "improvement_suggestions": []},
+        "outreach_messages": None,
+        "profile_improvements": None,
+        "errors": {},
+    }
+    async with db_pool.pool.acquire() as conn:
+        await conn.execute("UPDATE analyses SET status = 'completed', result = $2 WHERE id = $1", analysis_id, json.dumps(mock_result))
 
-    app.dependency_overrides[get_db] = override
-    try:
-        response = await client.get(f"/api/v1/analysis/{ANALYSIS_ID}")
-        assert response.status_code == 200
-        assert response.json()["result"]["match_result"]["score"] == 100
-    finally:
-        from tests.conftest import override_get_db
-
-        app.dependency_overrides[get_db] = override_get_db
+    response = await client.get(f"/api/v1/analysis/{analysis_id}")
+    assert response.status_code == 200
+    assert response.json()["result"]["match_result"]["score"] == 100
 
 
-async def test_get_analysis_rejects_wrong_owner(client: AsyncClient):
-    class OtherOwnerConnection:
-        async def fetchrow(self, *args, **kwargs):
-            return {
-                "id": ANALYSIS_ID,
-                "user_id": "00000000-0000-0000-0000-000000000000",
-                "status": "pending",
-                "result": None,
-                "created_at": datetime.now(timezone.utc),
-                "cv_text": "",
-                "jd_text": "",
-                "company": "",
-                "recruiter_name": "",
-            }
+async def test_get_analysis_rejects_wrong_owner(client: AsyncClient, sample_cv, sample_jd):
+    # Create analysis first
+    post_res = await client.post(
+        "/api/v1/analysis",
+        json={"cv_text": sample_cv, "jd_text": sample_jd, "company": "TestCorp"},
+    )
+    analysis_id = post_res.json()["analysis_id"]
+    
+    # Change owner in DB
+    from backend.db.connection import db_pool
+    import uuid
+    wrong_user_id = str(uuid.uuid4())
+    async with db_pool.pool.acquire() as conn:
+        await conn.execute("INSERT INTO users (id, email, hashed_password) VALUES ($1, $2, 'hash')", wrong_user_id, "wrong@test.com")
+        await conn.execute("UPDATE analyses SET user_id = $1 WHERE id = $2", wrong_user_id, analysis_id)
 
-    async def override():
-        yield OtherOwnerConnection()
-
-    app.dependency_overrides[get_db] = override
-    try:
-        response = await client.get(f"/api/v1/analysis/{ANALYSIS_ID}")
-        assert response.status_code == 403
-    finally:
-        from tests.conftest import override_get_db
-
-        app.dependency_overrides[get_db] = override_get_db
+    response = await client.get(f"/api/v1/analysis/{analysis_id}")
+    assert response.status_code == 403

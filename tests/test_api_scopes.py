@@ -1,11 +1,11 @@
 import pytest
 from httpx import AsyncClient
 from backend.main import app
-from tests.conftest import override_get_db
 from backend.db.connection import get_db
 from backend.api.deps import get_current_user
 
 pytestmark = pytest.mark.asyncio
+
 
 class ApiKeyConnection:
     async def fetchrow(self, query, *args):
@@ -26,40 +26,45 @@ class ApiKeyConnection:
             }
         return None
 
+
 async def test_extension_api_key_cannot_access_me(client: AsyncClient, mocker):
     connection = ApiKeyConnection()
+
     async def override():
         yield connection
-    
+
     new_overrides = app.dependency_overrides.copy()
     new_overrides.pop(get_current_user, None)
     new_overrides[get_db] = override
     mocker.patch.dict(app.dependency_overrides, new_overrides, clear=True)
 
     from jose import JWTError
+
     mocker.patch("jose.jwt.decode", side_effect=JWTError("Invalid token"))
     mocker.patch("backend.api.deps.hash_token", return_value="hashed")
     mocker.patch("fastapi.BackgroundTasks.add_task")
 
     response = await client.get(
-        "/api/v1/auth/me",
-        headers={"Authorization": "Bearer ext_fake_token"}
+        "/api/v1/auth/me", headers={"Authorization": "Bearer ext_fake_token"}
     )
 
     assert response.status_code == 403
     assert "API key does not have sufficient permissions" in response.json()["detail"]
 
+
 async def test_extension_api_key_can_access_analysis(client: AsyncClient, mocker):
     connection = ApiKeyConnection()
+
     async def override():
         yield connection
-    
+
     new_overrides = app.dependency_overrides.copy()
     new_overrides.pop(get_current_user, None)
     new_overrides[get_db] = override
     mocker.patch.dict(app.dependency_overrides, new_overrides, clear=True)
 
     from jose import JWTError
+
     mocker.patch("jose.jwt.decode", side_effect=JWTError("Invalid token"))
     mocker.patch("backend.api.deps.hash_token", return_value="hashed")
     mocker.patch("fastapi.BackgroundTasks.add_task")
@@ -67,8 +72,7 @@ async def test_extension_api_key_can_access_analysis(client: AsyncClient, mocker
     connection.fetch = mocker.AsyncMock(return_value=[])
 
     response = await client.get(
-        "/api/v1/analysis",
-        headers={"Authorization": "Bearer ext_fake_token"}
+        "/api/v1/analysis", headers={"Authorization": "Bearer ext_fake_token"}
     )
 
     # Expecting 200 OK or similar, but definitely not 403 API Scope block
