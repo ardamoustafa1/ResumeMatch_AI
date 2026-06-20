@@ -119,9 +119,27 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+
 volumes:
   postgres_data:
   redis_data:
   ollama_data:
   frontend_node_modules:
   frontend_next:
+  caddy_data:
+  caddy_config:

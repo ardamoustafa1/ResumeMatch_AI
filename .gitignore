@@ -10,3 +10,4 @@ env/
 postgres_data/
 redis_data/
 .DS_Store
+.coverage
