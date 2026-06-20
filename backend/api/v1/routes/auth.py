@@ -93,7 +93,9 @@ async def register(
             VALUES ($1, $2)
             RETURNING id, email, is_active, is_superuser, email_verified, created_at
         """
-        new_user = await conn.fetchrow(query, email, get_password_hash(user_in.password))
+        new_user = await conn.fetchrow(
+            query, email, get_password_hash(user_in.password)
+        )
         verification_token, token_hash, expires_at = create_one_time_token(
             timedelta(hours=24)
         )
@@ -111,6 +113,7 @@ async def register(
     except Exception:
         logger.exception("Verification email delivery failed")
     return dict(new_user)
+
 
 @router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("3/hour")
@@ -140,7 +143,9 @@ async def resend_verification(
             await send_verification_email(user["email"], verification_token)
         except Exception:
             logger.exception("Verification email delivery failed")
-    return {"message": "If the account exists and is unverified, a new verification link was sent."}
+    return {
+        "message": "If the account exists and is unverified, a new verification link was sent."
+    }
 
 
 @router.post("/login")
@@ -207,7 +212,7 @@ async def refresh_access_token(
 
     token_hash = hash_token(refresh_token)
     now = datetime.now(timezone.utc)
-    
+
     async with conn.transaction():
         record = await conn.fetchrow(
             """
@@ -219,12 +224,21 @@ async def refresh_access_token(
             """,
             token_hash,
         )
-        if (
-            not record
-            or record["revoked_at"] is not None
-            or record["expires_at"] <= now
-            or not record["is_active"]
-        ):
+        if not record or record["expires_at"] <= now or not record["is_active"]:
+            _clear_auth_cookies(response)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+            
+        if record["revoked_at"] is not None:
+            # Token family reuse detection: a revoked token was presented.
+            # Assume token theft and revoke ALL refresh tokens for this user.
+            await conn.execute(
+                "UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL",
+                now,
+                record["user_id"],
+            )
             _clear_auth_cookies(response)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -280,6 +294,20 @@ async def read_users_me(
     return current_user
 
 
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_users_me(
+    request: Request,
+    response: Response,
+    current_user: dict = Depends(get_current_user),
+    conn: Connection = Depends(get_db),
+) -> Response:
+    """Delete the current user account and all associated data."""
+    # The database schema has ON DELETE CASCADE for users -> analyses, api_keys, refresh_tokens, etc.
+    await conn.execute("DELETE FROM users WHERE id = $1", current_user["id"])
+    _clear_auth_cookies(response)
+    return response
+
+
 @router.post("/verify-email")
 @limiter.limit("10/hour")
 async def verify_email(
@@ -288,7 +316,7 @@ async def verify_email(
     conn: Connection = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
-    
+
     async with conn.transaction():
         record = await conn.fetchrow(
             """
@@ -401,23 +429,41 @@ async def generate_api_key(
     conn: Connection = Depends(get_db),
 ) -> Any:
     """Generate a scoped API key (1 year) for the Chrome Extension."""
+    # Check max limit
+    count = await conn.fetchval(
+        "SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND revoked_at IS NULL",
+        current_user["id"],
+    )
+    if count >= 5:
+        raise HTTPException(
+            status_code=400, detail="Maximum of 5 active API keys allowed."
+        )
+
     token = secrets.token_urlsafe(32)
     prefix = token[:8]
     hashed = hash_token(token)
     expires_at = datetime.now(timezone.utc) + timedelta(days=365)
-    
+    name = "Extension Key"
+
     await conn.execute(
         """
-        INSERT INTO api_keys (user_id, prefix, token_hash, scopes, expires_at)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO api_keys (user_id, prefix, token_hash, scopes, expires_at, name)
+        VALUES ($1, $2, $3, $4, $5, $6)
         """,
         current_user["id"],
         prefix,
         hashed,
         ["extension"],
-        expires_at
+        expires_at,
+        name,
     )
-    return {"access_token": token, "token_type": "bearer", "prefix": prefix, "expires_at": expires_at}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "prefix": prefix,
+        "name": name,
+        "expires_at": expires_at,
+    }
 
 
 @router.get("/api-keys")
@@ -428,7 +474,7 @@ async def list_api_keys(
     """List active API keys."""
     keys = await conn.fetch(
         """
-        SELECT id, prefix, scopes, expires_at, created_at
+        SELECT id, name, prefix, scopes, expires_at, created_at, last_used_at, device_info
         FROM api_keys
         WHERE user_id = $1 AND revoked_at IS NULL
         """,

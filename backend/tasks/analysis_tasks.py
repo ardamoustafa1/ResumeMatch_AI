@@ -21,7 +21,7 @@ from backend.services.telegram_service import (
     send_error_notification,
 )
 from backend.tasks.celery_app import celery_app
-from backend.tasks.progress_events import publish_progress_sync
+from backend.tasks.progress_events import publish_progress_sync, async_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -52,21 +52,31 @@ async def _process_analysis(analysis_id: str) -> None:
     """Run an idempotent analysis attempt and persist a complete or partial result."""
     if db_pool.pool is None:
         raise RuntimeError("DB pool not initialized in Celery worker.")
-        
+
     # Phase 1: Fetch and Lock
     async with db_pool.pool.acquire() as conn:
         record = await get_analysis(conn, analysis_id)
         if not record:
             raise LookupError(f"Analysis {analysis_id} does not exist.")
         if record["status"] in {"completed", "partial_completed"}:
-            logger.info("Analysis %s is already complete; skipping duplicate task.", analysis_id)
+            logger.info(
+                "Analysis %s is already complete; skipping duplicate task.", analysis_id
+            )
             return
-            
-        # Optional: Lock by setting to 'processing' and checking if it was already processing
-        # Since it's idempotency, if it is processing we just update it anyway.
+
+        # Use Redis distributed lock to prevent concurrent workers processing same analysis
+        lock_key = f"lock:analysis:{analysis_id}"
+        acquired = await async_redis_client.set(lock_key, "1", nx=True, ex=300)
+        if not acquired:
+            logger.info(
+                "Analysis %s is already being processed by another worker; skipping.",
+                analysis_id,
+            )
+            return
+
         publish_progress_sync(analysis_id, "validating", 10)
         await update_analysis_result(conn, analysis_id, "processing")
-        
+
         request = AnalysisRequest(
             cv_text=record["cv_text"],
             jd_text=record["jd_text"],
@@ -105,11 +115,13 @@ async def _process_analysis(analysis_id: str) -> None:
         )
     except Exception:
         logger.exception("Profile generation failed for %s", analysis_id)
-        result.errors["profile_improvements"] = "Profile improvements could not be generated."
+        result.errors["profile_improvements"] = (
+            "Profile improvements could not be generated."
+        )
 
     final_data = result.model_dump()
     final_status = "partial_completed" if result.errors else "completed"
-    
+
     # Phase 3: Save Results
     async with db_pool.pool.acquire() as conn:
         await update_analysis_result(conn, analysis_id, final_status, final_data)
@@ -132,6 +144,9 @@ async def _process_analysis(analysis_id: str) -> None:
                     recruiter_name=request.recruiter_name or "Not specified",
                     result=result,
                 )
+
+    # Release the lock after saving
+    await async_redis_client.delete(f"lock:analysis:{analysis_id}")
 
 
 async def _mark_analysis_failed(analysis_id: str, error: Exception) -> None:
@@ -198,12 +213,11 @@ def run_analysis_task(self, analysis_id: str):
 def purge_old_data_task() -> None:
     """Scheduled task to purge analysis data older than 30 days for GDPR compliance."""
     from datetime import datetime, timedelta, timezone
-    import asyncio
-    
+
     async def _purge():
         if db_pool.pool is None:
             await db_pool.connect()
-            
+
         if not db_pool.pool:
             logger.error("Failed to connect to DB for purge task.")
             return
@@ -216,5 +230,5 @@ def purge_old_data_task() -> None:
                 "DELETE FROM analyses WHERE created_at < $1", cutoff_date
             )
             logger.info(f"Purge complete. Result: {result}")
-            
+
     _run(_purge())

@@ -7,6 +7,16 @@ from pydantic import ValidationError
 from backend.db.connection import get_db
 from backend.core.security import ALGORITHM, SECRET_KEY, hash_token
 from datetime import datetime, timezone
+from fastapi import BackgroundTasks
+import enum
+
+
+class Scope(str, enum.Enum):
+    READ_ANALYSIS = "read:analysis"
+    WRITE_ANALYSIS = "write:analysis"
+    EXTRACT = "extract"
+    EXTENSION = "extension"
+
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",
@@ -16,6 +26,7 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 async def get_current_user(
     request: Request,
+    background_tasks: BackgroundTasks,
     conn: Connection = Depends(get_db),
     bearer_token: str | None = Depends(oauth2_scheme),
 ) -> dict:
@@ -47,21 +58,26 @@ async def get_current_user(
         hashed = hash_token(token)
         api_key_record = await conn.fetchrow(
             """
-            SELECT k.user_id, k.expires_at, k.revoked_at, k.scopes,
+            SELECT k.id as key_id, k.user_id, k.expires_at, k.revoked_at, k.scopes,
                    u.id, u.email, u.is_active, u.is_superuser, u.email_verified, u.created_at
             FROM api_keys k
             JOIN users u ON u.id = k.user_id
             WHERE k.token_hash = $1
             """,
-            hashed
+            hashed,
         )
         if not api_key_record:
             raise credentials_exception
         now = datetime.now(timezone.utc)
-        if api_key_record["revoked_at"] is not None or (api_key_record["expires_at"] and api_key_record["expires_at"] <= now):
+        if api_key_record["revoked_at"] is not None or (
+            api_key_record["expires_at"] and api_key_record["expires_at"] <= now
+        ):
             raise credentials_exception
         user = dict(api_key_record)
-        if "extension" in str(user.get("scopes", "")):
+        user["id"] = api_key_record[
+            "user_id"
+        ]  # Fix id mapping because user id and key id overlap
+        if Scope.EXTENSION in user.get("scopes", []):
             if request.url.path == "/api/v1/analysis/export":
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -74,6 +90,26 @@ async def get_current_user(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="API key does not have sufficient permissions for this action",
                 )
+
+        # Schedule async update of usage metadata
+        user_agent = request.headers.get("user-agent", "unknown")
+
+        async def update_usage(key_id: str, ua: str):
+            async with db_pool.pool.acquire() as update_conn:
+                await update_conn.execute(
+                    "UPDATE api_keys SET last_used_at = $1, device_info = $2 WHERE id = $3",
+                    datetime.now(timezone.utc),
+                    ua,
+                    key_id,
+                )
+
+        # db_pool is needed here. Import it.
+        from backend.db.connection import db_pool
+
+        background_tasks.add_task(
+            update_usage, str(api_key_record["key_id"]), user_agent
+        )
+
     if not user["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

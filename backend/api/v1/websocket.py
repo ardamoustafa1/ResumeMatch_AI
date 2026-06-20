@@ -15,10 +15,10 @@ router = APIRouter()
 
 WS_TICKET_TTL = 60
 
+
 @router.post("/ticket")
 async def generate_ws_ticket(
-    analysis_id: str,
-    current_user: dict = Depends(get_current_user)
+    analysis_id: str, current_user: dict = Depends(get_current_user)
 ):
     ticket = str(uuid.uuid4())
     redis_key = f"ws_ticket:{ticket}:{analysis_id}"
@@ -30,18 +30,18 @@ async def _authorize(websocket: WebSocket, analysis_id: str) -> bool:
     origin = websocket.headers.get("origin")
     if origin and origin not in settings.allowed_origins:
         return False
-        
+
     ticket = websocket.query_params.get("ticket")
     if not ticket or db_pool.pool is None:
         return False
-        
+
     redis_key = f"ws_ticket:{ticket}:{analysis_id}"
     email_bytes = await async_redis_client.get(redis_key)
     if not email_bytes:
         return False
-    
+
     email = email_bytes.decode("utf-8")
-    
+
     async with db_pool.pool.acquire() as connection:
         owner = await connection.fetchval(
             """

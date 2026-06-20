@@ -14,16 +14,19 @@ logger = logging.getLogger(__name__)
 async def extract_text_from_pdf(file_bytes: bytes) -> str:
     """Extracts text from a PDF file using PyMuPDF."""
     try:
+
         def _load_pdf():
             doc = fitz_module.open(stream=file_bytes, filetype="pdf")
             if len(doc) > settings.max_pdf_pages:
-                raise ValueError(f"PDF exceeds the {settings.max_pdf_pages} page limit.")
+                raise ValueError(
+                    f"PDF exceeds the {settings.max_pdf_pages} page limit."
+                )
             res = ""
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
                 res += page.get_text() + "\n"
             return res.strip()
-            
+
         text = await asyncio.to_thread(_load_pdf)
         return text
     except Exception as e:
@@ -34,6 +37,7 @@ async def extract_text_from_pdf(file_bytes: bytes) -> str:
 async def extract_text_from_image(file_bytes: bytes) -> str:
     """Extracts text from an image using Tesseract OCR."""
     try:
+
         def _load_image():
             image_module.MAX_IMAGE_PIXELS = settings.max_image_pixels
             img = image_module.open(io.BytesIO(file_bytes))

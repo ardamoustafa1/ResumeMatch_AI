@@ -18,12 +18,13 @@ celery_app.conf.update(
     enable_utc=True,
     worker_concurrency=4,
     task_routes={
-        "backend.tasks.analysis_tasks.run_analysis_task": {"queue": "high_priority"}
+        "backend.tasks.analysis_tasks.run_analysis_task": {"queue": "high_priority"},
+        "backend.tasks.analysis_tasks.purge_old_data_task": {"queue": "low_priority"},
     },
     beat_schedule={
         "purge-old-data-daily": {
             "task": "backend.tasks.analysis_tasks.purge_old_data_task",
-            "schedule": 86400.0, # run every 24 hours
+            "schedule": 86400.0,  # run every 24 hours
         }
     },
 )

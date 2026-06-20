@@ -14,15 +14,16 @@ from backend.db.queries import (
 )
 from backend.models.schemas import AnalysisRequest, AnalysisResponse
 from backend.tasks.analysis_tasks import run_analysis_task
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
 @router.post("/demo")
 async def demo_analysis():
     import uuid
-    from datetime import datetime, timezone
-    
+
     mock_id = str(uuid.uuid4())
     mock_data = {
         "analysis_id": mock_id,
@@ -30,27 +31,34 @@ async def demo_analysis():
         "result": {
             "match_result": {
                 "score": 92,
-                "matched_skills": ["React", "FastAPI", "PostgreSQL", "Docker", "TypeScript"],
+                "matched_skills": [
+                    "React",
+                    "FastAPI",
+                    "PostgreSQL",
+                    "Docker",
+                    "TypeScript",
+                ],
                 "missing_skills": ["GraphQL", "Kubernetes"],
                 "improvement_suggestions": [
                     "Highlight your REST API design experience",
-                    "Add metrics on how your Dockerization improved build times"
-                ]
+                    "Add metrics on how your Dockerization improved build times",
+                ],
             },
             "outreach_messages": {
                 "dm_first_contact": "Hi! I noticed your team is building a scalable career copilot. My background in Next.js and FastAPI directly aligns with the stack mentioned in the job description.",
                 "dm_follow_up": "Just floating this up! Let me know if you have 5 minutes this week.",
-                "connection_note": "Hi! I'm an engineer specializing in React & FastAPI, would love to connect and discuss the open backend role."
+                "connection_note": "Hi! I'm an engineer specializing in React & FastAPI, would love to connect and discuss the open backend role.",
             },
             "profile_improvements": {
                 "headline_before": "Software Developer",
                 "headline_after": "Senior Full-Stack Engineer | React & Python | Building Scalable SaaS",
-                "about_section": "I build robust, local-first applications using Next.js and FastAPI. My focus is on deterministic outcomes and secure architectures."
+                "about_section": "I build robust, local-first applications using Next.js and FastAPI. My focus is on deterministic outcomes and secure architectures.",
             },
-            "errors": {}
-        }
+            "errors": {},
+        },
     }
     return mock_data
+
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("5/minute")
@@ -108,17 +116,18 @@ async def export_analyses(
         WHERE user_id = $1::uuid
         ORDER BY created_at DESC
         """,
-        str(current_user["id"])
+        str(current_user["id"]),
     )
-    
+
     import json
+
     records = []
     for row in rows:
         record = dict(row)
         if record.get("result") and isinstance(record["result"], str):
             record["result"] = json.loads(record["result"])
         records.append(record)
-        
+
     return {"data": records}
 
 
@@ -143,12 +152,13 @@ async def list_analyses(
 
 @router.get("/{analysis_id}")
 async def get_analysis_status(
-    analysis_id: str,
+    analysis_id: UUID,
     current_user: dict = Depends(get_current_user),
     conn: Connection = Depends(get_db),
 ):
+    analysis_id_str = str(analysis_id)
     try:
-        record = await get_analysis(conn, analysis_id)
+        record = await get_analysis(conn, analysis_id_str)
         if not record:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -189,24 +199,22 @@ async def get_analysis_status(
             detail={"error": "Internal server error", "code": "INTERNAL_ERROR"},
         )
 
+
 @router.delete("/{analysis_id}")
 async def delete_analysis_endpoint(
-    analysis_id: str,
+    analysis_id: UUID,
     current_user: dict = Depends(get_current_user),
-    conn: Connection = Depends(get_db)
+    conn: Connection = Depends(get_db),
 ):
-    try:
-        import uuid
-        val = uuid.UUID(analysis_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid analysis ID.")
-    
+
     deleted = await conn.execute(
         "DELETE FROM analyses WHERE id = $1 AND user_id = $2",
-        val,
-        current_user["id"]
+        analysis_id,
+        current_user["id"],
     )
     if deleted == "DELETE 0":
-        raise HTTPException(status_code=404, detail="Analysis not found or unauthorized.")
-        
+        raise HTTPException(
+            status_code=404, detail="Analysis not found or unauthorized."
+        )
+
     return {"status": "deleted"}

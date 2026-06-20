@@ -30,7 +30,9 @@ class AnalysisRequest(BaseModel):
         if len(v.strip()) < 50:
             raise ValueError("Job Description text must be at least 50 characters long")
         if len(v.strip()) > 50000:
-            raise ValueError("Job Description text must be at most 50,000 characters long")
+            raise ValueError(
+                "Job Description text must be at most 50,000 characters long"
+            )
         return v
 
     model_config = ConfigDict(

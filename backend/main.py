@@ -21,11 +21,32 @@ from backend.tasks.progress_events import async_redis_client
 logger.remove()
 logger.add(sys.stderr, format="{time} {level} {message}", level="INFO")
 
+
+def strip_sensitive_data(event, hint):
+    if "request" in event:
+        request = event["request"]
+        # Scrub headers
+        if "headers" in request:
+            headers = request["headers"]
+            if "authorization" in headers:
+                headers["authorization"] = "[Filtered]"
+            if "cookie" in headers:
+                headers["cookie"] = "[Filtered]"
+        # Scrub data
+        if "data" in request and isinstance(request["data"], dict):
+            data = request["data"]
+            for field in ["password", "token", "cv_text", "jd_text", "email", "phone"]:
+                if field in data:
+                    data[field] = "[Filtered]"
+    return event
+
+
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        before_send=strip_sensitive_data,
     )
 
 
@@ -50,7 +71,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler) # type: ignore[arg-type]
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,12 +85,16 @@ app.add_middleware(
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss: https:;"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss: https:;"
+    )
     return response
 
 
