@@ -1,0 +1,17 @@
+{
+  "name": "NetworkForge",
+  "short_name": "NetworkForge",
+  "description": "Open-source, privacy-first career intelligence.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080a0f",
+  "theme_color": "#080a0f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
