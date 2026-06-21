@@ -40,6 +40,28 @@ def create_access_token(
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def create_mfa_token(subject: str | Any) -> str:
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=5)
+    payload = {
+        "exp": expire,
+        "iat": now,
+        "sub": str(subject),
+        "type": "mfa",
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verify_mfa_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "mfa":
+            return None
+        return payload.get("sub")
+    except jwt.JWTError:
+        return None
+
+
 def create_refresh_token() -> tuple[str, str, datetime]:
     token = secrets.token_urlsafe(48)
     digest = hash_token(token)
