@@ -79,6 +79,7 @@ async def start_analysis(
             jd_text=payload.jd_text,
             company=payload.company,
             recruiter_name=payload.recruiter_name,
+            workspace_id=payload.workspace_id,
         )
         try:
             run_analysis_task.delay(analysis_id)
@@ -110,6 +111,7 @@ async def start_analysis(
 async def list_analyses(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    workspace_id: str | None = Query(default=None),
     current_user: dict = Security(
         get_current_user, scopes=[Scope.READ_ANALYSIS, Scope.EXTENSION]
     ),
@@ -119,6 +121,7 @@ async def list_analyses(
         "items": await get_user_analyses(
             conn,
             str(current_user["id"]),
+            workspace_id=workspace_id,
             limit=limit,
             offset=offset,
         ),

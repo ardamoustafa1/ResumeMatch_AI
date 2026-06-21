@@ -10,28 +10,18 @@ async def create_analysis(
     jd_text: str,
     company: Optional[str] = None,
     recruiter_name: Optional[str] = None,
+    workspace_id: Optional[str] = None,
 ) -> str:
     """
     Insert a new analysis record into the database.
-
-    Args:
-        conn (Connection): The asyncpg connection
-        user_id (str): The ID of the user requesting the analysis
-        cv_text (str): Candidate's CV text
-        jd_text (str): Job description text
-        company (Optional[str]): Hiring company name
-        recruiter_name (Optional[str]): Recruiter's name
-
-    Returns:
-        str: The UUID of the newly created analysis as a string
     """
     query = """
-        INSERT INTO analyses (user_id, cv_text, jd_text, company, recruiter_name, status)
-        VALUES ($1::uuid, $2, $3, $4, $5, 'pending')
+        INSERT INTO analyses (user_id, cv_text, jd_text, company, recruiter_name, workspace_id, status)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid, 'pending')
         RETURNING id;
     """
     analysis_id = await conn.fetchval(
-        query, user_id, cv_text, jd_text, company, recruiter_name
+        query, user_id, cv_text, jd_text, company, recruiter_name, workspace_id
     )
     return str(analysis_id)
 
@@ -97,34 +87,45 @@ async def update_analysis_result(
 
 
 async def get_user_analyses(
-    conn: Connection, user_id: str, limit: int = 50, offset: int = 0
+    conn: Connection, user_id: str, workspace_id: Optional[str] = None, limit: int = 50, offset: int = 0
 ) -> List[Dict[str, Any]]:
     """
-    Retrieve a list of analyses for a specific user.
-
-    Args:
-        conn (Connection): The asyncpg connection
-        user_id (str): The ID of the user
-        limit (int): Pagination limit
-        offset (int): Pagination offset
-
-    Returns:
-        List[Dict[str, Any]]: A list of analysis records
+    Retrieve a list of analyses for a specific user or workspace.
     """
-    query = """
-        SELECT id, user_id, company, recruiter_name, status, created_at
-        FROM analyses
-        WHERE user_id = $1::uuid
-        ORDER BY created_at DESC
-        LIMIT $2 OFFSET $3;
-    """
-    rows = await conn.fetch(query, user_id, limit, offset)
+    if workspace_id:
+        # Check if user has access to workspace
+        has_access = await conn.fetchval(
+            "SELECT 1 FROM workspace_members WHERE workspace_id = $1::uuid AND user_id = $2::uuid",
+            workspace_id, user_id
+        )
+        if not has_access:
+            return []
+            
+        query = """
+            SELECT id, user_id, company, recruiter_name, status, created_at, workspace_id
+            FROM analyses
+            WHERE workspace_id = $1::uuid
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3;
+        """
+        rows = await conn.fetch(query, workspace_id, limit, offset)
+    else:
+        query = """
+            SELECT id, user_id, company, recruiter_name, status, created_at, workspace_id
+            FROM analyses
+            WHERE user_id = $1::uuid AND workspace_id IS NULL
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3;
+        """
+        rows = await conn.fetch(query, user_id, limit, offset)
 
     results = []
     for row in rows:
         record = dict(row)
         record["id"] = str(record["id"])
         record["user_id"] = str(record["user_id"])
+        if record.get("workspace_id"):
+            record["workspace_id"] = str(record["workspace_id"])
         results.append(record)
 
     return results
