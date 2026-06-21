@@ -3,7 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ShieldCheck, Sparkles } from "lucide-react"
+import Image from "next/image"
+import { ArrowLeft, Check, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api"
 import type { User } from "@/lib/types"
 import { useAuthStore } from "@/stores/authStore"
+import { BrandMark } from "@/components/brand-mark"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -26,6 +28,8 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false)
   const [acceptedTOS, setAcceptedTOS] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [mfaToken, setMfaToken] = useState("")
+  const [mfaCode, setMfaCode] = useState("")
   const router = useRouter()
   const setUser = useAuthStore((state) => state.setUser)
 
@@ -51,6 +55,18 @@ export default function LoginPage() {
         return
       }
 
+      if (mfaToken) {
+        await apiFetch("/auth/mfa/verify", {
+          method: "POST",
+          body: JSON.stringify({ mfa_token: mfaToken, code: mfaCode }),
+        })
+        const user = await apiFetch<User>("/auth/me")
+        setUser(user)
+        toast.success("Welcome back.")
+        router.replace("/dashboard")
+        return
+      }
+
       const form = new URLSearchParams({ username: email, password })
       const response = await fetch("/api/v1/auth/login", {
         method: "POST",
@@ -61,6 +77,13 @@ export default function LoginPage() {
       if (!response.ok) {
         throw new Error("Email or password is incorrect.")
       }
+      const data = await response.json()
+      if (data.status === "mfa_required") {
+        setMfaToken(data.mfa_token)
+        toast.info("Two-factor authentication required.")
+        return
+      }
+
       const user = await apiFetch<User>("/auth/me")
       setUser(user)
       toast.success("Welcome back.")
@@ -73,32 +96,76 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.18),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(147,51,234,0.16),transparent_32%)]" />
-      <div className="relative w-full max-w-md">
+    <main className="dashboard-shell relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(80,98,235,0.15),transparent_34%),radial-gradient(circle_at_80%_80%,rgba(139,80,220,0.11),transparent_32%)]" />
+      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[1.6rem] border border-white/[0.09] bg-[#0d1017]/95 shadow-[0_50px_140px_rgba(0,0,0,.55)] lg:grid-cols-[1.04fr_.96fr]">
+        <section className="relative hidden min-h-[660px] overflow-hidden border-r border-white/[0.07] p-9 lg:flex lg:flex-col">
+          <Image src="/brand/networkforge-hero.png" alt="" fill priority sizes="52vw" className="object-cover opacity-65" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0b0e14] via-[#0b0e14]/45 to-[#0b0e14]/15" />
+          <div className="relative">
+            <BrandMark />
+          </div>
+          <div className="relative mt-auto max-w-md">
+            <p className="eyebrow text-[#9aa4ff]">Private career intelligence</p>
+            <h1 className="mt-4 text-4xl font-semibold leading-[1.06] tracking-[-0.055em]">
+              Make the next move with evidence.
+            </h1>
+            <p className="mt-4 text-sm leading-7 text-zinc-400">
+              Understand your fit, sharpen your positioning, and write outreach that starts with something real.
+            </p>
+            <div className="mt-7 space-y-3">
+              {["Explainable role matching", "Local Ollama inference", "Editable, grounded outreach"].map((item) => (
+                <div key={item} className="flex items-center gap-2.5 text-xs text-zinc-300">
+                  <span className="flex size-5 items-center justify-center rounded-full bg-emerald-400/10">
+                    <Check className="size-3 text-emerald-400" />
+                  </span>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <div className="relative flex min-h-[620px] flex-col justify-center p-5 sm:p-10 lg:p-12">
         <Link
           href="/"
-          className="mb-5 inline-flex items-center gap-2 text-sm text-zinc-400 transition hover:text-white"
+          className="absolute left-5 top-5 inline-flex items-center gap-2 text-xs text-zinc-600 transition hover:text-white sm:left-10 sm:top-8 lg:left-12"
         >
           <ArrowLeft className="size-4" />
           Back to overview
         </Link>
-        <Card>
+        <BrandMark className="mb-8 mt-10 lg:hidden" />
+        <Card className="border-0 bg-transparent shadow-none backdrop-blur-none">
           <CardHeader>
-            <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-blue-600/15 text-blue-400">
-              <Sparkles className="size-6" />
-            </div>
             <CardTitle>
-              {isRegister ? "Create your account" : "Sign in to ResumeMatch"}
+              {mfaToken ? "Two-Factor Authentication" : isRegister ? "Create your account" : "Sign in to NetworkForge"}
             </CardTitle>
             <CardDescription>
-              {isRegister
+              {mfaToken ? "Enter the 6-digit code from your authenticator app." : isRegister
                 ? "Use a strong password to protect the personal data in your CV."
                 : "Continue to your private analysis workspace."}
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
+              {mfaToken ? (
+                <div className="space-y-2">
+                  <label htmlFor="mfaCode" className="text-sm font-medium">Authenticator Code</label>
+                  <Input
+                    id="mfaCode"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
+                    value={mfaCode}
+                    onChange={(event) => setMfaCode(event.target.value)}
+                    required
+                    maxLength={6}
+                    placeholder="000000"
+                  />
+                </div>
+              ) : (
+                <>
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">
                   Email address
@@ -161,15 +228,20 @@ export default function LoginPage() {
                 Authentication is stored in secure HTTP-only cookies, not browser
                 local storage.
               </div>
+              </>
+              )}
             </CardContent>
             <CardFooter className="flex-col gap-3">
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading
                   ? "Please wait…"
-                  : isRegister
-                    ? "Create account"
-                    : "Sign in"}
+                  : mfaToken
+                    ? "Verify Code"
+                    : isRegister
+                      ? "Create account"
+                      : "Sign in"}
               </Button>
+              {!mfaToken && (
               <button
                 type="button"
                 onClick={() => {
@@ -182,9 +254,16 @@ export default function LoginPage() {
                   ? "Already registered? Sign in"
                   : "New here? Create an account"}
               </button>
+              )}
+              {mfaToken && (
+                <button type="button" onClick={() => setMfaToken("")} className="text-sm text-zinc-400 transition hover:text-white">
+                  Cancel
+                </button>
+              )}
             </CardFooter>
           </form>
         </Card>
+        </div>
       </div>
     </main>
   )
