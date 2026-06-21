@@ -1,0 +1,16 @@
+name: Security Advisories
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Weekly on Monday
+  workflow_dispatch:
+
+permissions:
+  security-events: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync Security Advisories
+        run: echo "Dependabot and GitHub Advanced Security are active. GHSA automatically creates alerts and PRs."
