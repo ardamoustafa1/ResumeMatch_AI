@@ -20,6 +20,7 @@ def test_migrations_upgrade_downgrade():
 
     # Point alembic to the test DB
     import os
+
     alembic_cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
 
     # Run upgrade head
