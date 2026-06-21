@@ -14,14 +14,13 @@ from backend.models.schemas import (
     FullAnalysisResult,
 )
 
-from backend.services.providers import GroqProvider, OllamaProvider
+from backend.services.providers import registry
+from backend.services.scoring import get_scoring_strategy
+import logging
 
 logger = logging.getLogger(__name__)
 
-# --- Configuration ---
-# Providers are initialized dynamically
-groq_provider = GroqProvider()
-ollama_provider = OllamaProvider()
+# Providers are dynamically resolved using the registry
 
 
 # --- Exceptions ---
@@ -87,25 +86,24 @@ You must output ONLY valid JSON matching this exact structure:
 async def _generate_json(system_prompt: str, user_prompt: str, provider: str = "auto") -> Dict[str, Any]:
     """
     Primary orchestrator for AI generation.
-    Tries Groq first, falls back to Ollama on APIError or missing key.
+    Resolves the provider dynamically from the registry.
     Retries once if JSONDecodeError occurs.
     """
     try:
-        if provider.lower() == "ollama":
-            return await ollama_provider.generate_json(system_prompt, user_prompt)
-        elif provider.lower() == "groq":
-            return await groq_provider.generate_json(system_prompt, user_prompt)
-        else:
-            return await groq_provider.generate_json(system_prompt, user_prompt)
-    except Exception as e:
         if provider.lower() == "auto":
-            logger.warning(f"Groq failed ({e}). Falling back to Ollama.")
+            # Default fallback logic for 'auto'
             try:
-                return await ollama_provider.generate_json(system_prompt, user_prompt)
-            except Exception:
-                raise
-        raise
-
+                p = registry.get("groq")
+                return await p.generate_json(system_prompt, user_prompt)
+            except Exception as e:
+                logger.warning(f"Auto (Groq) failed ({e}). Falling back to Ollama.")
+                p_fb = registry.get("ollama")
+                return await p_fb.generate_json(system_prompt, user_prompt)
+        
+        # Explicit provider resolution
+        p = registry.get(provider)
+        return await p.generate_json(system_prompt, user_prompt)
+        
     except json.JSONDecodeError as e:
         logger.error(
             "Failed to decode JSON from AI. Raw response redacted to protect PII."
@@ -166,10 +164,10 @@ def mask_pii(text: str) -> str:
     return text
 
 
-async def analyze_cv_jd_match(cv: str, jd: str, provider: str = "auto", language: str = "English") -> MatchResult:
+async def analyze_cv_jd_match(cv: str, jd: str, provider: str = "auto", language: str = "English", scoring_strategy: str = "default") -> MatchResult:
     """
     Analyzes CV against JD to determine match score and missing/matched skills.
-    Uses deterministic math for the score based on extracted skills.
+    Uses configurable scoring strategy for the score based on extracted skills.
     """
     safe_cv = mask_pii(cv)
     safe_jd = mask_pii(jd)
@@ -187,17 +185,9 @@ async def analyze_cv_jd_match(cv: str, jd: str, provider: str = "auto", language
         matched = data.get("matched_skills", [])
         missing = data.get("missing_skills", [])
 
-        # Naive weights: matched=10, missing=10 (adjust depending on mandatory vs optional in future logic)
-        total_skills = len(matched) + len(missing)
-        if total_skills > 0:
-            # We add a baseline + penalize missing skills heavily
-            score = (len(matched) / total_skills) * 100
-            # Apply a non-linear curve to penalize having too many missing skills
-            penalty = len(missing) * 2.5
-            final_score = max(0, min(100, int(score - penalty)))
-            data["score"] = final_score
-        else:
-            data["score"] = 0
+        # Use Strategy
+        strategy = get_scoring_strategy(scoring_strategy)
+        data["score"] = strategy.calculate_score(matched, missing)
 
         return MatchResult(**data)
     except asyncio.TimeoutError:
@@ -269,7 +259,7 @@ async def run_full_pipeline(request: AnalysisRequest) -> FullAnalysisResult:
     try:
         logger.info("Starting CV/JD match analysis...")
         result.match_result = await analyze_cv_jd_match(
-            request.cv_text, request.jd_text, provider, language
+            request.cv_text, request.jd_text, provider, language, request.scoring_strategy
         )
     except Exception as e:
         logger.error(f"Failed to generate match result: {e}")
