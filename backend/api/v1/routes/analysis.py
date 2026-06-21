@@ -11,6 +11,7 @@ from backend.db.queries import (
     create_analysis,
     get_analysis,
     get_user_analyses,
+    log_audit_event,
     update_analysis_result,
 )
 from backend.models.schemas import AnalysisRequest, AnalysisResponse
@@ -65,7 +66,9 @@ async def demo_analysis():
 async def start_analysis(
     request: Request,
     payload: AnalysisRequest,
-    current_user: dict = Security(get_current_user, scopes=[]),
+    current_user: dict = Security(
+        get_current_user, scopes=[Scope.WRITE_ANALYSIS, Scope.EXTENSION]
+    ),
     conn: Connection = Depends(get_db),
 ):
     try:
@@ -103,13 +106,13 @@ async def start_analysis(
         )
 
 
-
-
 @router.get("")
 async def list_analyses(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    current_user: dict = Security(get_current_user, scopes=[Scope.EXTENSION]),
+    current_user: dict = Security(
+        get_current_user, scopes=[Scope.READ_ANALYSIS, Scope.EXTENSION]
+    ),
     conn: Connection = Depends(get_db),
 ):
     return {
@@ -127,7 +130,9 @@ async def list_analyses(
 @router.get("/{analysis_id}")
 async def get_analysis_status(
     analysis_id: UUID,
-    current_user: dict = Security(get_current_user, scopes=[Scope.EXTENSION]),
+    current_user: dict = Security(
+        get_current_user, scopes=[Scope.READ_ANALYSIS, Scope.EXTENSION]
+    ),
     conn: Connection = Depends(get_db),
 ):
     analysis_id_str = str(analysis_id)
@@ -177,10 +182,11 @@ async def get_analysis_status(
 @router.delete("/{analysis_id}")
 async def delete_analysis(
     analysis_id: str,
-    current_user: dict = Security(get_current_user, scopes=[]),
+    current_user: dict = Security(
+        get_current_user, scopes=[Scope.WRITE_ANALYSIS, Scope.EXTENSION]
+    ),
     conn: Connection = Depends(get_db),
 ):
-
     deleted = await conn.execute(
         "DELETE FROM analyses WHERE id = $1 AND user_id = $2",
         analysis_id,
@@ -190,5 +196,43 @@ async def delete_analysis(
         raise HTTPException(
             status_code=404, detail="Analysis not found or unauthorized."
         )
+    await log_audit_event(
+        conn,
+        "analysis.deleted",
+        user_id=str(current_user["id"]),
+        ip_address=None,
+        metadata={"analysis_id": analysis_id},
+    )
 
     return {"status": "deleted"}
+
+
+@router.patch("/{analysis_id}")
+async def update_analysis(
+    analysis_id: UUID,
+    payload: dict,
+    current_user: dict = Security(
+        get_current_user, scopes=[Scope.WRITE_ANALYSIS, Scope.EXTENSION]
+    ),
+    conn: Connection = Depends(get_db),
+):
+    analysis_id_str = str(analysis_id)
+    record = await get_analysis(conn, analysis_id_str)
+    if not record or str(record["user_id"]) != str(current_user["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found or unauthorized.",
+        )
+    if record["status"] not in {"completed", "partial_completed"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only update completed analyses.",
+        )
+
+    import json
+    await conn.execute(
+        "UPDATE analyses SET result = $1 WHERE id = $2",
+        json.dumps(payload),
+        analysis_id_str,
+    )
+    return {"status": "updated"}
