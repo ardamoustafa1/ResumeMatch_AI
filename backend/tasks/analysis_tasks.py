@@ -12,6 +12,7 @@ from backend.db.queries import (
     update_analysis_result,
 )
 from backend.models.schemas import AnalysisRequest, FullAnalysisResult
+from backend.core.prometheus_metrics import analysis_tasks_total
 from backend.services.ai_engine import (
     analyze_cv_jd_match,
     generate_outreach_messages,
@@ -109,7 +110,9 @@ async def _process_analysis(analysis_id: str) -> None:
             )
         except Exception:
             logger.exception("Outreach generation failed for %s", analysis_id)
-            result.errors["outreach_messages"] = "Outreach messages could not be generated."
+            result.errors["outreach_messages"] = (
+                "Outreach messages could not be generated."
+            )
 
         publish_progress_sync(analysis_id, "improving_profile", 85)
         try:
@@ -129,6 +132,7 @@ async def _process_analysis(analysis_id: str) -> None:
         # Phase 3: Save Results
         async with db_pool.pool.acquire() as conn:
             await update_analysis_result(conn, analysis_id, final_status, final_data)
+            analysis_tasks_total.labels(status=final_status).inc()
             publish_progress_sync(
                 analysis_id,
                 final_status,
@@ -167,6 +171,7 @@ async def _mark_analysis_failed(analysis_id: str, error: Exception) -> None:
                 "failed",
                 {"error": "Analysis could not be completed after multiple attempts."},
             )
+            analysis_tasks_total.labels(status="failed").inc()
             publish_progress_sync(
                 analysis_id,
                 "failed",
@@ -236,5 +241,30 @@ def purge_old_data_task() -> None:
                 "DELETE FROM analyses WHERE created_at < $1", cutoff_date
             )
             logger.info(f"Purge complete. Result: {result}")
+            await conn.execute(
+                """
+                DELETE FROM refresh_tokens
+                WHERE expires_at < $1 OR revoked_at < $1
+                """,
+                cutoff_date,
+            )
+            await conn.execute(
+                """
+                DELETE FROM email_verification_tokens
+                WHERE expires_at < $1 OR used_at < $1
+                """,
+                cutoff_date,
+            )
+            await conn.execute(
+                """
+                DELETE FROM password_reset_tokens
+                WHERE expires_at < $1 OR used_at < $1
+                """,
+                cutoff_date,
+            )
+            await conn.execute(
+                "DELETE FROM audit_events WHERE created_at < $1",
+                datetime.now(timezone.utc) - timedelta(days=180),
+            )
 
     _run(_purge())
