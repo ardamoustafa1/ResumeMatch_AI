@@ -1,0 +1,20 @@
+groups:
+- name: resumematch_alerts
+  rules:
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: High HTTP error rate
+      description: "More than 5% of requests have failed in the last 5 minutes."
+
+  - alert: HighDBPoolUsage
+    expr: db_pool_active_connections / db_pool_size > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: High database connection pool usage
+      description: "DB connection pool is over 80% utilized for more than 5 minutes."
