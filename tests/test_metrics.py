@@ -1,7 +1,7 @@
 """Tests for core/metrics.py - MetricsTracker logging."""
-import pytest
+
 import logging
-from backend.core.metrics import metrics, MetricsTracker
+from backend.core.metrics import metrics
 
 
 def test_log_llm_call(caplog):
@@ -45,3 +45,12 @@ def test_log_api_request(caplog):
     assert "method=POST" in caplog.text
     assert "status=200" in caplog.text
     assert "latency_ms=45.60" in caplog.text
+
+
+async def test_prometheus_endpoint_exports_request_metrics(client):
+    response = await client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    assert "http_requests_total" in response.text
+    assert "http_request_duration_seconds" in response.text
