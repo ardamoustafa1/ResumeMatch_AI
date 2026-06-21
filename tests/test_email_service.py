@@ -1,8 +1,12 @@
 import pytest
-from unittest.mock import patch, MagicMock, call
-from backend.services.email_service import _send_sync, send_email, send_verification_email, send_password_reset_email
-
 from unittest.mock import MagicMock
+from backend.services.email_service import (
+    _send_sync,
+    send_email,
+    send_verification_email,
+    send_password_reset_email,
+)
+
 
 def test_send_sync(mocker):
     # Mock settings
@@ -17,7 +21,9 @@ def test_send_sync(mocker):
 
     # Mock smtplib.SMTP
     mock_smtp_instance = MagicMock()
-    mock_smtp = mocker.patch("backend.services.email_service.smtplib.SMTP", return_value=mock_smtp_instance)
+    mock_smtp = mocker.patch(
+        "backend.services.email_service.smtplib.SMTP", return_value=mock_smtp_instance
+    )
     mock_smtp_instance.__enter__.return_value = mock_smtp_instance
 
     _send_sync("test@example.com", "Test Subject", "Test Body")
@@ -26,7 +32,7 @@ def test_send_sync(mocker):
     mock_smtp_instance.starttls.assert_called_once()
     mock_smtp_instance.login.assert_called_once_with("testuser", "testpass")
     mock_smtp_instance.send_message.assert_called_once()
-    
+
     # Check the email message
     sent_message = mock_smtp_instance.send_message.call_args[0][0]
     assert sent_message["From"] == "noreply@test.com"
@@ -47,7 +53,9 @@ def test_send_sync_no_tls_no_auth(mocker):
     mocker.patch("backend.services.email_service.settings", mock_settings)
 
     mock_smtp_instance = MagicMock()
-    mocker.patch("backend.services.email_service.smtplib.SMTP", return_value=mock_smtp_instance)
+    mocker.patch(
+        "backend.services.email_service.smtplib.SMTP", return_value=mock_smtp_instance
+    )
     mock_smtp_instance.__enter__.return_value = mock_smtp_instance
 
     _send_sync("test@example.com", "Subject", "Body")
@@ -63,9 +71,9 @@ async def test_send_email_skipped(mocker):
     mock_settings.smtp_host = ""
     mocker.patch("backend.services.email_service.settings", mock_settings)
     mock_send_sync = mocker.patch("backend.services.email_service._send_sync")
-    
+
     result = await send_email("test@example.com", "Subject", "Body")
-    
+
     assert result is False
     mock_send_sync.assert_not_called()
 
@@ -76,9 +84,9 @@ async def test_send_email_success(mocker):
     mock_settings.smtp_host = "smtp.test.com"
     mocker.patch("backend.services.email_service.settings", mock_settings)
     mock_send_sync = mocker.patch("backend.services.email_service._send_sync")
-    
+
     result = await send_email("test@example.com", "Subject", "Body")
-    
+
     assert result is True
     mock_send_sync.assert_called_once_with("test@example.com", "Subject", "Body")
 
@@ -88,10 +96,12 @@ async def test_send_verification_email(mocker):
     mock_settings = MagicMock()
     mock_settings.frontend_url = "https://app.test.com"
     mocker.patch("backend.services.email_service.settings", mock_settings)
-    mock_send_email = mocker.patch("backend.services.email_service.send_email", return_value=True)
-    
+    mock_send_email = mocker.patch(
+        "backend.services.email_service.send_email", return_value=True
+    )
+
     result = await send_verification_email("user@example.com", "fake_token_123")
-    
+
     assert result is True
     mock_send_email.assert_called_once()
     args = mock_send_email.call_args[0]
@@ -105,10 +115,12 @@ async def test_send_password_reset_email(mocker):
     mock_settings = MagicMock()
     mock_settings.frontend_url = "https://app.test.com"
     mocker.patch("backend.services.email_service.settings", mock_settings)
-    mock_send_email = mocker.patch("backend.services.email_service.send_email", return_value=True)
-    
+    mock_send_email = mocker.patch(
+        "backend.services.email_service.send_email", return_value=True
+    )
+
     result = await send_password_reset_email("user@example.com", "reset_token_456")
-    
+
     assert result is True
     mock_send_email.assert_called_once()
     args = mock_send_email.call_args[0]
