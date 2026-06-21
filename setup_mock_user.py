@@ -1,8 +1,0 @@
-"""Backward-compatible entry point for creating a development user."""
-
-from register_user import main
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
