@@ -1,0 +1,24 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = [
+  ".git",
+  ".venv",
+  "venv",
+  "backend/venv",
+  "backend/db/migrations",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.bandit]
+exclude_dirs = [
+  ".venv",
+  "venv",
+  "backend/venv",
+  "backend/.mypy_cache",
+  "backend/.ruff_cache",
+  "tests",
+]
+skips = ["B105"]
