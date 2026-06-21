@@ -1,12 +1,7 @@
 """Tests for api/deps.py - get_current_user with JWT and API key paths."""
-import pytest
-from datetime import timedelta, datetime, timezone
-from httpx import AsyncClient
-from tests.conftest import USER_ID
-from backend.core.security import create_access_token, hash_token
-import uuid
 
-pytestmark = pytest.mark.asyncio
+from httpx import AsyncClient
+from backend.core.security import create_access_token
 
 
 async def test_get_current_user_via_jwt_cookie(client: AsyncClient):
@@ -21,8 +16,8 @@ async def test_get_current_user_via_jwt_cookie(client: AsyncClient):
 
 async def test_get_current_user_no_token(client: AsyncClient, mocker):
     """With no token, get_current_user should return 401."""
-    from backend.api.deps import get_current_user
     from backend.main import app
+
     # Temporarily remove the mock override
     overrides = app.dependency_overrides.copy()
     app.dependency_overrides.clear()
@@ -47,6 +42,7 @@ async def test_get_current_user_via_api_key(client: AsyncClient):
     # so API keys will be denied by default (403). Let's test that.
     # Clear cookie-based auth and use Bearer token
     from backend.main import app
+
     overrides = app.dependency_overrides.copy()
     app.dependency_overrides.clear()
 
@@ -63,12 +59,16 @@ async def test_get_current_user_via_api_key(client: AsyncClient):
 async def test_get_current_user_inactive_user(client: AsyncClient, mocker):
     """Inactive users should receive 403 even with valid token."""
     from backend.db.connection import db_pool
+
     # Set qa@example.com to inactive
     async with db_pool.pool.acquire() as conn:
-        await conn.execute("UPDATE users SET is_active = FALSE WHERE email = 'qa@example.com'")
+        await conn.execute(
+            "UPDATE users SET is_active = FALSE WHERE email = 'qa@example.com'"
+        )
 
     # Temporarily remove mocked override so deps.py logic runs
     from backend.main import app
+
     overrides = app.dependency_overrides.copy()
     app.dependency_overrides.clear()
 
@@ -81,6 +81,8 @@ async def test_get_current_user_inactive_user(client: AsyncClient, mocker):
 
     # Restore is_active
     async with db_pool.pool.acquire() as conn:
-        await conn.execute("UPDATE users SET is_active = TRUE WHERE email = 'qa@example.com'")
+        await conn.execute(
+            "UPDATE users SET is_active = TRUE WHERE email = 'qa@example.com'"
+        )
 
     assert response.status_code == 403
