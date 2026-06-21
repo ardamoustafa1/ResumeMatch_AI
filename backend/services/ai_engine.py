@@ -1,12 +1,9 @@
-import os
 import json
 import logging
 import asyncio
 import re
 from typing import Dict, Any
 
-import httpx
-from groq import AsyncGroq
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
 from backend.models.schemas import (
@@ -17,16 +14,14 @@ from backend.models.schemas import (
     FullAnalysisResult,
 )
 
+from backend.services.providers import GroqProvider, OllamaProvider
+
 logger = logging.getLogger(__name__)
 
 # --- Configuration ---
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:8b")
-
-# Initialize Groq client if key is available
-groq_client = AsyncGroq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+# Providers are initialized dynamically
+groq_provider = GroqProvider()
+ollama_provider = OllamaProvider()
 
 
 # --- Exceptions ---
@@ -80,41 +75,7 @@ You must output ONLY valid JSON matching this exact structure:
 # --- Helper Methods ---
 
 
-async def _call_groq(system_prompt: str, user_prompt: str) -> str:
-    """Calls Groq API."""
-    if not groq_client:
-        raise ProviderUnavailableError("GROQ_API_KEY is not set.")
 
-    response = await groq_client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.0,
-        response_format={"type": "json_object"},
-    )
-    return response.choices[0].message.content or ""
-
-
-async def _call_ollama(system_prompt: str, user_prompt: str) -> str:
-    """Calls local Ollama as a fallback."""
-    logger.info(f"Using Ollama fallback with model {OLLAMA_MODEL}")
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        payload = {
-            "model": OLLAMA_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "format": "json",
-            "stream": False,
-            "options": {"temperature": 0.0},
-        }
-        response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
-        response.raise_for_status()
-        data = response.json()
-        return data["message"]["content"]
 
 
 @retry(
@@ -123,26 +84,32 @@ async def _call_ollama(system_prompt: str, user_prompt: str) -> str:
     retry=retry_if_exception_type(json.JSONDecodeError),
     reraise=True,
 )
-async def _generate_json(system_prompt: str, user_prompt: str) -> Dict[str, Any]:
+async def _generate_json(system_prompt: str, user_prompt: str, provider: str = "auto") -> Dict[str, Any]:
     """
     Primary orchestrator for AI generation.
     Tries Groq first, falls back to Ollama on APIError or missing key.
     Retries once if JSONDecodeError occurs.
     """
-    raw_response = ""
     try:
-        raw_response = await _call_groq(system_prompt, user_prompt)
+        if provider.lower() == "ollama":
+            return await ollama_provider.generate_json(system_prompt, user_prompt)
+        elif provider.lower() == "groq":
+            return await groq_provider.generate_json(system_prompt, user_prompt)
+        else:
+            return await groq_provider.generate_json(system_prompt, user_prompt)
     except Exception as e:
-        logger.warning(f"Groq failed ({e}). Falling back to Ollama.")
-        raw_response = await _call_ollama(system_prompt, user_prompt)
+        if provider.lower() == "auto":
+            logger.warning(f"Groq failed ({e}). Falling back to Ollama.")
+            try:
+                return await ollama_provider.generate_json(system_prompt, user_prompt)
+            except Exception:
+                raise
+        raise
 
-    try:
-        return json.loads(raw_response)
     except json.JSONDecodeError as e:
         logger.error(
             "Failed to decode JSON from AI. Raw response redacted to protect PII."
         )
-        # When tenacity retries, we can append a strict reminder to the prompt
         system_prompt += "\\nCRITICAL: Output ONLY valid JSON. No markdown formatting."
         raise e
 
@@ -199,7 +166,7 @@ def mask_pii(text: str) -> str:
     return text
 
 
-async def analyze_cv_jd_match(cv: str, jd: str) -> MatchResult:
+async def analyze_cv_jd_match(cv: str, jd: str, provider: str = "auto", language: str = "English") -> MatchResult:
     """
     Analyzes CV against JD to determine match score and missing/matched skills.
     Uses deterministic math for the score based on extracted skills.
@@ -207,10 +174,13 @@ async def analyze_cv_jd_match(cv: str, jd: str) -> MatchResult:
     safe_cv = mask_pii(cv)
     safe_jd = mask_pii(jd)
     user_prompt = f"CV:\\n<UNTRUSTED>\\n<CV>{safe_cv}</CV>\\n</UNTRUSTED>\\n\\nJob Description:\\n<UNTRUSTED>\\n<JD>{safe_jd}</JD>\\n</UNTRUSTED>"
+    sys_prompt = MATCH_PROMPT_SYSTEM
+    if language.lower() != "english":
+        sys_prompt += f"\\nCRITICAL: You must translate the JSON values (e.g. skills, suggestions) into {language}. Do not change the JSON keys."
 
     try:
         data = await asyncio.wait_for(
-            _generate_json(MATCH_PROMPT_SYSTEM, user_prompt), timeout=30.0
+            _generate_json(sys_prompt, user_prompt, provider), timeout=30.0
         )
 
         # Deterministic Weighted Score Calculation
@@ -235,7 +205,7 @@ async def analyze_cv_jd_match(cv: str, jd: str) -> MatchResult:
 
 
 async def generate_outreach_messages(
-    cv: str, jd: str, company: str, recruiter_name: str, match_result: MatchResult
+    cv: str, jd: str, company: str, recruiter_name: str, match_result: MatchResult, provider: str = "auto", language: str = "English"
 ) -> OutreachMessages:
     """
     Generates personalized outreach messages.
@@ -249,10 +219,13 @@ async def generate_outreach_messages(
         f"Missing Skills to avoid mentioning: {', '.join(match_result.missing_skills)}\\n\\n"
         f"CV:\\n<UNTRUSTED>\\n<CV>{safe_cv}</CV>\\n</UNTRUSTED>\\n\\nJob Description:\\n<UNTRUSTED>\\n<JD>{safe_jd}</JD>\\n</UNTRUSTED>"
     )
+    sys_prompt = OUTREACH_PROMPT_SYSTEM
+    if language.lower() != "english":
+        sys_prompt += f"\\nCRITICAL: Write the outreach messages natively in {language}. Do not change the JSON keys."
 
     try:
         data = await asyncio.wait_for(
-            _generate_json(OUTREACH_PROMPT_SYSTEM, context), timeout=30.0
+            _generate_json(sys_prompt, context, provider), timeout=30.0
         )
         return OutreachMessages(**data)
     except asyncio.TimeoutError:
@@ -261,17 +234,20 @@ async def generate_outreach_messages(
         )
 
 
-async def generate_profile_improvements(cv: str, jd: str) -> ProfileImprovements:
+async def generate_profile_improvements(cv: str, jd: str, provider: str = "auto", language: str = "English") -> ProfileImprovements:
     """
     Suggests LinkedIn profile improvements based on CV and targeted JD.
     """
     safe_cv = mask_pii(cv)
     safe_jd = mask_pii(jd)
     user_prompt = f"Target Job Description:\\n<UNTRUSTED>\\n<JD>{safe_jd}</JD>\\n</UNTRUSTED>\\n\\nCandidate CV:\\n<UNTRUSTED>\\n<CV>{safe_cv}</CV>\\n</UNTRUSTED>"
+    sys_prompt = PROFILE_IMPROVEMENTS_PROMPT_SYSTEM
+    if language.lower() != "english":
+        sys_prompt += f"\\nCRITICAL: Write the profile improvements natively in {language}. Do not change the JSON keys."
 
     try:
         data = await asyncio.wait_for(
-            _generate_json(PROFILE_IMPROVEMENTS_PROMPT_SYSTEM, user_prompt),
+            _generate_json(sys_prompt, user_prompt, provider),
             timeout=30.0,
         )
         return ProfileImprovements(**data)
@@ -286,12 +262,14 @@ async def run_full_pipeline(request: AnalysisRequest) -> FullAnalysisResult:
     Orchestrates the entire AI analysis pipeline, handling partial failures.
     """
     result = FullAnalysisResult()
+    provider = request.provider
+    language = request.language
 
     # Step 1: Match Analysis (Critical Path)
     try:
         logger.info("Starting CV/JD match analysis...")
         result.match_result = await analyze_cv_jd_match(
-            request.cv_text, request.jd_text
+            request.cv_text, request.jd_text, provider, language
         )
     except Exception as e:
         logger.error(f"Failed to generate match result: {e}")
@@ -308,6 +286,8 @@ async def run_full_pipeline(request: AnalysisRequest) -> FullAnalysisResult:
                 company=request.company or "our company",
                 recruiter_name=request.recruiter_name or "a recruiter",
                 match_result=result.match_result,
+                provider=provider,
+                language=language,
             )
         except Exception as e:
             logger.error(f"Failed to generate outreach messages: {e}")
@@ -316,7 +296,7 @@ async def run_full_pipeline(request: AnalysisRequest) -> FullAnalysisResult:
     try:
         logger.info("Starting profile improvements generation...")
         result.profile_improvements = await generate_profile_improvements(
-            request.cv_text, request.jd_text
+            request.cv_text, request.jd_text, provider, language
         )
     except Exception as e:
         logger.error(f"Failed to generate profile improvements: {e}")
