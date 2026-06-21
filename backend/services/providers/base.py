@@ -20,3 +20,18 @@ class LLMProvider(ABC):
         Must return a parsed dictionary. Raises exceptions on failure.
         """
         pass
+
+class ProviderRegistry:
+    def __init__(self):
+        self._providers: Dict[str, LLMProvider] = {}
+        
+    def register(self, provider: LLMProvider):
+        self._providers[provider.name.lower()] = provider
+        
+    def get(self, name: str) -> LLMProvider:
+        provider = self._providers.get(name.lower())
+        if not provider:
+            raise ValueError(f"Provider {name} not found in registry.")
+        return provider
+
+registry = ProviderRegistry()
