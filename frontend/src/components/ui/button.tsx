@@ -6,11 +6,11 @@ type Variant = "default" | "secondary" | "ghost" | "outline" | "danger"
 type Size = "default" | "sm" | "lg" | "icon"
 
 const variants: Record<Variant, string> = {
-  default: "bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500",
-  secondary: "bg-zinc-800 text-zinc-100 hover:bg-zinc-700",
-  ghost: "bg-transparent text-zinc-300 hover:bg-zinc-800 hover:text-white",
-  outline: "border border-zinc-700 bg-transparent text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900",
-  danger: "bg-red-600 text-white hover:bg-red-500",
+  default: "border border-white/10 bg-[#6c7cff] text-white shadow-[0_10px_30px_rgba(76,91,220,.28),inset_0_1px_0_rgba(255,255,255,.22)] hover:bg-[#7b89ff] hover:shadow-[0_14px_36px_rgba(76,91,220,.36)]",
+  secondary: "border border-white/[0.08] bg-white/[0.055] text-zinc-100 hover:bg-white/[0.09]",
+  ghost: "bg-transparent text-zinc-400 hover:bg-white/[0.06] hover:text-white",
+  outline: "border border-white/[0.12] bg-black/10 text-zinc-200 hover:border-white/20 hover:bg-white/[0.055]",
+  danger: "border border-red-400/20 bg-red-500/90 text-white hover:bg-red-500",
 }
 
 const sizes: Record<Size, string> = {
@@ -33,8 +33,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center gap-2 font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50",
-          "rounded-lg", // Default rounding, size 'lg' overrides with 'rounded-full'
+          "inline-flex items-center justify-center gap-2 font-semibold tracking-[-0.01em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8f9aff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080a0f] disabled:cursor-not-allowed disabled:opacity-50",
+          "rounded-xl",
           variants[variant],
           sizes[size],
           className
