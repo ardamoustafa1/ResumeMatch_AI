@@ -30,11 +30,15 @@ ResumeMatch AI is a web platform for analyzing CVs against Job Descriptions usin
 |-------------|-------------|---------------------|
 | **Spoofing** | Attacker impersonates a user via stolen tokens. | JWT with short TTL, HttpOnly Secure cookies, Refresh Token rotation with token family tracking. API keys with strict scopes. |
 | **Tampering**| Attacker modifies API requests or DB directly. | Strong input validation using Pydantic. Use SQLAlchemy/asyncpg parameterized queries to prevent SQLi. Internal DB not exposed to public internet. |
-| **Repudiation** | User denies performing an action (e.g. deleting account). | Audit logs for critical actions. Retain minimal logs to comply with GDPR. |
+| **Repudiation** | User denies performing an action (e.g. deleting account). | Minimal audit events for login, export, deletion, and API-key lifecycle; 180-day retention. |
 | **Information Disclosure** | PII leakage via Sentry, LLM, or unauthorized API access. | Implement PII scrubbing before LLM API calls and Sentry logging. Enforce strict row-level security / endpoint ownership checks. TLS/HTTPS enforced. |
 | **Denial of Service** | Abuse of AI generation endpoint to incur high costs / CPU load. | Enforce rate limiting via `slowapi` on endpoints. Limit CV/JD payload sizes. Queue system (Celery) prevents main API loop blocking. |
-| **Elevation of Privilege** | Normal user accesses admin endpoints or other users' data. | RBAC implementation (`is_superuser`). Strong dependency checks (Dependabot, pip-audit, Trivy). |
+| **Elevation of Privilege** | A user or extension key accesses another user's data or an undeclared endpoint. | Object ownership checks, deny-by-default API-key scopes, and integration tests. |
 
 ## 5. Known Risks & Acceptances
 - **LLM Hallucination/Injection**: Mitigated by system prompt constraints, but full prevention is impossible.
 - **Local/Self-hosted Security**: If deployed locally, security depends on host configuration. Docker isolation helps but is not foolproof if host is compromised.
+- **Browser Extension Storage**: CV text and API keys persist in
+  `chrome.storage.local`. Users must revoke keys on shared or lost devices.
+- **Regex PII Redaction**: Redaction reduces common exposure but cannot
+  guarantee anonymization. Operators remain responsible for provider terms.
