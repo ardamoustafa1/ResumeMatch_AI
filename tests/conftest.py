@@ -37,13 +37,14 @@ async def clean_db(setup_test_pool):
         await conn.execute("TRUNCATE TABLE api_keys CASCADE;")
         await conn.execute("TRUNCATE TABLE users CASCADE;")
         
+        from backend.core.security import get_password_hash
         # Insert test user
         await conn.execute(
             """
             INSERT INTO users (id, email, hashed_password, is_active)
             VALUES ($1, $2, $3, $4)
             """,
-            USER_ID, "qa@example.com", "dummy_hash", True
+            USER_ID, "qa@example.com", get_password_hash("ValidPassword!123"), True
         )
     
     # Clean redis via a fresh client to avoid loop issues
