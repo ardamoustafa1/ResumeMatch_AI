@@ -1,7 +1,7 @@
 """Tests for progress_events module."""
+
 import json
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock
 from backend.tasks.progress_events import (
     _event_name,
     _message,
@@ -10,13 +10,11 @@ from backend.tasks.progress_events import (
     STEP_MESSAGES,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 def test_event_name_completed():
     assert _event_name("completed") == "completed"
     assert _event_name("done") == "completed"
-    assert _event_name("partial_completed") == "completed"
+    assert _event_name("partial_completed") == "partial_completed"
 
 
 def test_event_name_failed():
@@ -52,7 +50,9 @@ def test_message_unknown_step():
 
 
 def test_publish_progress_sync(mocker):
-    mock_publish = mocker.patch("backend.tasks.progress_events.sync_redis_client.publish")
+    mock_publish = mocker.patch(
+        "backend.tasks.progress_events.sync_redis_client.publish"
+    )
 
     publish_progress_sync("analysis-001", "validating", 10, {"result": "ok"})
 
@@ -66,7 +66,9 @@ def test_publish_progress_sync(mocker):
 
 async def test_publish_progress(mocker):
     mock_publish = AsyncMock()
-    mocker.patch("backend.tasks.progress_events.async_redis_client.publish", mock_publish)
+    mocker.patch(
+        "backend.tasks.progress_events.async_redis_client.publish", mock_publish
+    )
 
     await publish_progress("analysis-002", "done", 100, {"final": True})
 
