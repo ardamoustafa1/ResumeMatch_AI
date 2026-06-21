@@ -1,1 +1,1 @@
-"""ResumeMatch AI backend package."""
+"""NetworkForge backend package."""
