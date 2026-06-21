@@ -1,6 +1,6 @@
 import os
-from locust import HttpUser, task, between, events
-import time
+from locust import HttpUser, task, between
+
 
 class ResumeMatchUser(HttpUser):
     wait_time = between(1, 3)
