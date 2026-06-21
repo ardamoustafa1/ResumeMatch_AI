@@ -14,8 +14,10 @@ class AnalysisRequest(BaseModel):
     jd_text: str = Field(..., description="The full text of the Job Description")
     company: Optional[str] = Field(None, description="The name of the hiring company")
     recruiter_name: Optional[str] = Field(None, description="The name of the recruiter")
+    workspace_id: Optional[str] = Field(None, description="The workspace ID if this analysis belongs to a team workspace")
     provider: str = Field("auto", description="AI Provider to use (auto, groq, ollama)")
     language: str = Field("English", description="Target language for output")
+    scoring_strategy: str = Field("default", description="Scoring strategy to use (default, strict_keyword)")
 
     @field_validator("cv_text")
     @classmethod
