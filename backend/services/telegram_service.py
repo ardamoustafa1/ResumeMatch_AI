@@ -99,7 +99,7 @@ async def verify_telegram_config(bot_token: str, chat_id: str) -> bool:
     Returns True if successfully delivered.
     """
     text = (
-        "✅ *ResumeMatch AI Verification*\\n\\n"
+        "✅ *NetworkForge Verification*\\n\\n"
         "Your Telegram integration is fully operational\\! 🚀"
     )
     try:
@@ -120,7 +120,7 @@ async def send_error_notification(
     safe_error = format_message_for_telegram(str(error), truncate_len=500)
 
     text = (
-        "❌ *ResumeMatch AI Analysis Failed*\\n\\n"
+        "❌ *NetworkForge Analysis Failed*\\n\\n"
         f"Tracking ID: `{safe_analysis_id}`\\n"
         f"Error Details: {safe_error}"
     )
@@ -164,7 +164,7 @@ async def send_analysis_complete(
         missing = "None"
 
     text = (
-        "✅ *ResumeMatch AI Analysis Complete*\\n\\n"
+        "✅ *NetworkForge Analysis Complete*\\n\\n"
         f"🎯 Match Score: *{score}%*\\n"
         f"🏢 Company: {safe_company}\\n"
         f"👤 Recruiter: {safe_recruiter}\\n\\n"
