@@ -4,6 +4,7 @@ export interface User {
   is_active: boolean
   is_superuser: boolean
   email_verified: boolean
+  mfa_enabled: boolean
   created_at: string
 }
 
