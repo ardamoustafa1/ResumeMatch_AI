@@ -2,7 +2,11 @@ groups:
 - name: resumematch_alerts
   rules:
   - alert: HighErrorRate
-    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+    expr: >
+      sum(rate(http_requests_total{status=~"5.."}[5m]))
+      /
+      clamp_min(sum(rate(http_requests_total[5m])), 0.001)
+      > 0.05
     for: 2m
     labels:
       severity: critical
@@ -18,3 +22,25 @@ groups:
     annotations:
       summary: High database connection pool usage
       description: "DB connection pool is over 80% utilized for more than 5 minutes."
+
+  - alert: ResumeMatchAPIDown
+    expr: up{job="resumematch_api"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: ResumeMatch API is unavailable
+      description: "Prometheus has been unable to scrape the API for one minute."
+
+  - alert: AnalysisFailureRate
+    expr: >
+      sum(rate(analysis_tasks_total{status="failed"}[15m]))
+      /
+      clamp_min(sum(rate(analysis_tasks_total[15m])), 0.001)
+      > 0.05
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: Elevated analysis failure rate
+      description: "More than 5% of analysis tasks have failed in the last 15 minutes."
