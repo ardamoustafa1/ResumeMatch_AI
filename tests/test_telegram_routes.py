@@ -1,9 +1,6 @@
 """Tests for Telegram routes."""
-import pytest
-from httpx import AsyncClient
-from tests.conftest import USER_ID
 
-pytestmark = pytest.mark.asyncio
+from httpx import AsyncClient
 
 
 async def test_configure_telegram_no_bot_token(client: AsyncClient, mocker):
