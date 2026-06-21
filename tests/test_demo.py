@@ -1,7 +1,4 @@
-import pytest
 from httpx import AsyncClient
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_demo_endpoint_returns_instant_mock(client: AsyncClient):
