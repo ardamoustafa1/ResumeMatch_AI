@@ -35,7 +35,7 @@ async def send_verification_email(recipient: str, token: str) -> bool:
     link = f"{settings.frontend_url}/verify-email?token={token}"
     return await send_email(
         recipient,
-        "Verify your ResumeMatch AI account",
+        "Verify your NetworkForge account",
         f"Verify your account by opening this link:\n\n{link}\n\n"
         "This link expires in 24 hours.",
     )
@@ -45,7 +45,7 @@ async def send_password_reset_email(recipient: str, token: str) -> bool:
     link = f"{settings.frontend_url}/reset-password?token={token}"
     return await send_email(
         recipient,
-        "Reset your ResumeMatch AI password",
+        "Reset your NetworkForge password",
         f"Reset your password by opening this link:\n\n{link}\n\n"
         "This link expires in one hour. Ignore this email if you did not request it.",
     )
