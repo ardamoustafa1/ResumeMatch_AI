@@ -14,6 +14,8 @@ class AnalysisRequest(BaseModel):
     jd_text: str = Field(..., description="The full text of the Job Description")
     company: Optional[str] = Field(None, description="The name of the hiring company")
     recruiter_name: Optional[str] = Field(None, description="The name of the recruiter")
+    provider: str = Field("auto", description="AI Provider to use (auto, groq, ollama)")
+    language: str = Field("English", description="Target language for output")
 
     @field_validator("cv_text")
     @classmethod
@@ -42,6 +44,8 @@ class AnalysisRequest(BaseModel):
                 "jd_text": "Looking for a Senior Backend Engineer proficient in Python, AsyncIO, and Redis...",
                 "company": "TechCorp",
                 "recruiter_name": "Alice Smith",
+                "provider": "auto",
+                "language": "English",
             }
         }
     )
@@ -70,6 +74,13 @@ class AnalysisResponse(BaseModel):
             }
         },
     )
+
+
+class AnalysisUpdate(BaseModel):
+    """
+    Request payload to update an existing analysis result.
+    """
+    result: Dict[str, Any] = Field(..., description="The full updated JSON result blob")
 
 
 class MessageOutput(BaseModel):
@@ -188,6 +199,7 @@ class UserResponse(BaseModel):
     is_active: bool
     is_superuser: bool
     email_verified: bool
+    mfa_enabled: bool = False
     created_at: datetime
 
 
