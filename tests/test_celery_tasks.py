@@ -10,8 +10,6 @@ from backend.models.schemas import (
 from backend.tasks.analysis_tasks import _process_analysis
 from tests.conftest import ANALYSIS_ID, USER_ID
 
-pytestmark = pytest.mark.asyncio
-
 
 class FakeConnection:
     async def __aenter__(self):
@@ -53,7 +51,7 @@ def task_mocks(mocker):
     mocker.patch(
         "backend.tasks.analysis_tasks.async_redis_client.get",
         new_callable=AsyncMock,
-        return_value="mock_token", # In a real test this should match lock_token
+        return_value="mock_token",  # In a real test this should match lock_token
     )
     mocker.patch(
         "backend.tasks.analysis_tasks.async_redis_client.delete",
