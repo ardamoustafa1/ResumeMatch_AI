@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 
 
 from backend.api.v1 import websocket
-from backend.api.v1.routes import analysis, auth, extract, health, telegram, metrics, admin, oauth, saml
+from backend.api.v1.routes import analysis, auth, extract, health, telegram, metrics, admin, oauth, saml, workspaces
 from backend.core.config import settings
 from backend.core.rate_limit import limiter
 from backend.db.connection import db_pool
@@ -248,6 +248,7 @@ app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSockets"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(oauth.router, prefix="/api/v1/oauth", tags=["OAuth SSO"])
 app.include_router(saml.router, prefix="/api/v1/saml", tags=["Enterprise SAML"])
+app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["Workspaces"])
 app.include_router(metrics.router, prefix="/metrics", tags=["Metrics"])
 
 
