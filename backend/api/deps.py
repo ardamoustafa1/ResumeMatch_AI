@@ -49,7 +49,7 @@ async def get_current_user(
             raise credentials_exception
         user = await conn.fetchrow(
             """
-            SELECT id, email, is_active, is_superuser, email_verified, created_at
+            SELECT id, email, is_active, is_superuser, email_verified, created_at, mfa_enabled
             FROM users
             WHERE email = $1
             """,
@@ -62,7 +62,7 @@ async def get_current_user(
         api_key_record = await conn.fetchrow(
             """
             SELECT k.id as key_id, k.user_id, k.expires_at, k.revoked_at, k.scopes,
-                   u.id, u.email, u.is_active, u.is_superuser, u.email_verified, u.created_at
+                   u.id, u.email, u.is_active, u.is_superuser, u.email_verified, u.created_at, u.mfa_enabled
             FROM api_keys k
             JOIN users u ON u.id = k.user_id
             WHERE k.token_hash = $1
@@ -81,14 +81,16 @@ async def get_current_user(
             "user_id"
         ]  # Fix id mapping because user id and key id overlap
         user["auth_type"] = "api_key"
-        
+
         if security_scopes.scopes:
-            for scope in security_scopes.scopes:
-                if scope not in user.get("scopes", []):
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="API key does not have sufficient permissions for this action",
-                    )
+            has_permission = any(
+                scope in user.get("scopes", []) for scope in security_scopes.scopes
+            )
+            if not has_permission:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="API key does not have sufficient permissions for this action",
+                )
         else:
             # Deny API keys by default on endpoints that don't declare required scopes
             raise HTTPException(
