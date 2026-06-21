@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from asyncpg import Connection
 
 
@@ -152,3 +152,28 @@ async def get_telegram_config(
     if row:
         return dict(row)
     return None
+
+
+async def log_audit_event(
+    conn: Connection,
+    event_type: str,
+    *,
+    user_id: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    """Persist a minimal, non-sensitive security audit event."""
+    await conn.execute(
+        """
+        INSERT INTO audit_events (
+            user_id, event_type, ip_address, user_agent, metadata
+        )
+        VALUES ($1::uuid, $2, $3::inet, $4, $5::jsonb)
+        """,
+        user_id,
+        event_type,
+        ip_address,
+        (user_agent or "")[:255] or None,
+        json.dumps(metadata or {}),
+    )
