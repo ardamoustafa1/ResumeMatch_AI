@@ -231,10 +231,10 @@ make down       # stop the stack
 - [x] Real-time analysis progress
 - [x] MFA, data export, and account deletion
 - [x] Prometheus and Grafana observability
-- [ ] Side-by-side CV version comparison
-- [ ] Pluggable extraction and scoring strategies
-- [ ] Community provider adapters
-- [ ] Team workspaces for career coaches
+- [x] Side-by-side CV version comparison
+- [x] Pluggable extraction and scoring strategies
+- [x] Community provider adapters
+- [x] Team workspaces for career coaches
 
 Have a strong opinion about what should come next? [Start a discussion](https://github.com/ardamoustafa1/NetworkForge/discussions).
 
