@@ -1,5 +1,5 @@
 """Tests for services/ai_engine.py."""
-import json
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from backend.services.ai_engine import (
@@ -15,8 +15,6 @@ from backend.services.ai_engine import (
     ProviderUnavailableError,
 )
 from backend.models.schemas import MatchResult, AnalysisRequest
-
-pytestmark = pytest.mark.asyncio
 
 
 def test_mask_pii_email():
@@ -71,9 +69,9 @@ async def test_call_ollama_success(mocker):
 
     mocker.patch("httpx.AsyncClient.post", return_value=mock_response)
     mock_ctx = MagicMock()
-    mock_ctx.__aenter__ = AsyncMock(return_value=MagicMock(
-        post=AsyncMock(return_value=mock_response)
-    ))
+    mock_ctx.__aenter__ = AsyncMock(
+        return_value=MagicMock(post=AsyncMock(return_value=mock_response))
+    )
     mock_ctx.__aexit__ = AsyncMock(return_value=None)
     mocker.patch("httpx.AsyncClient", return_value=mock_ctx)
 
@@ -82,14 +80,20 @@ async def test_call_ollama_success(mocker):
 
 
 async def test_generate_json_groq_success(mocker):
-    mocker.patch("backend.services.ai_engine._call_groq", return_value='{"key": "value"}')
+    mocker.patch(
+        "backend.services.ai_engine._call_groq", return_value='{"key": "value"}'
+    )
     result = await _generate_json("system", "user")
     assert result == {"key": "value"}
 
 
 async def test_generate_json_falls_back_to_ollama(mocker):
-    mocker.patch("backend.services.ai_engine._call_groq", side_effect=Exception("Groq down"))
-    mocker.patch("backend.services.ai_engine._call_ollama", return_value='{"fallback": true}')
+    mocker.patch(
+        "backend.services.ai_engine._call_groq", side_effect=Exception("Groq down")
+    )
+    mocker.patch(
+        "backend.services.ai_engine._call_ollama", return_value='{"fallback": true}'
+    )
     result = await _generate_json("system", "user")
     assert result == {"fallback": True}
 
@@ -122,7 +126,10 @@ async def test_analyze_cv_jd_match_no_skills(mocker):
 
 async def test_analyze_cv_jd_match_timeout(mocker):
     import asyncio
-    mocker.patch("backend.services.ai_engine._generate_json", side_effect=asyncio.TimeoutError())
+
+    mocker.patch(
+        "backend.services.ai_engine._generate_json", side_effect=asyncio.TimeoutError()
+    )
     with pytest.raises(AnalysisTimeoutError):
         await analyze_cv_jd_match("cv", "jd")
 
@@ -134,17 +141,32 @@ async def test_generate_outreach_messages_success(mocker):
         "connection_note": "Connect with me",
     }
     mocker.patch("backend.services.ai_engine._generate_json", return_value=mock_data)
-    
-    match = MatchResult(score=85, match_reasoning="Good match", matched_skills=["Python"], missing_skills=["Rust"], improvement_suggestions=[])
+
+    match = MatchResult(
+        score=85,
+        match_reasoning="Good match",
+        matched_skills=["Python"],
+        missing_skills=["Rust"],
+        improvement_suggestions=[],
+    )
     result = await generate_outreach_messages("cv", "jd", "Corp", "Alice", match)
     assert result.dm_first_contact == "Hi there!"
 
 
 async def test_generate_outreach_messages_timeout(mocker):
     import asyncio
-    mocker.patch("backend.services.ai_engine._generate_json", side_effect=asyncio.TimeoutError())
-    
-    match = MatchResult(score=85, match_reasoning="Good match", matched_skills=["Python"], missing_skills=[], improvement_suggestions=[])
+
+    mocker.patch(
+        "backend.services.ai_engine._generate_json", side_effect=asyncio.TimeoutError()
+    )
+
+    match = MatchResult(
+        score=85,
+        match_reasoning="Good match",
+        matched_skills=["Python"],
+        missing_skills=[],
+        improvement_suggestions=[],
+    )
     with pytest.raises(AnalysisTimeoutError):
         await generate_outreach_messages("cv", "jd", "Corp", "Alice", match)
 
@@ -162,7 +184,10 @@ async def test_generate_profile_improvements_success(mocker):
 
 async def test_generate_profile_improvements_timeout(mocker):
     import asyncio
-    mocker.patch("backend.services.ai_engine._generate_json", side_effect=asyncio.TimeoutError())
+
+    mocker.patch(
+        "backend.services.ai_engine._generate_json", side_effect=asyncio.TimeoutError()
+    )
     with pytest.raises(AnalysisTimeoutError):
         await generate_profile_improvements("cv", "jd")
 
@@ -171,9 +196,17 @@ async def test_run_full_pipeline_success(mocker):
     mock_match = MagicMock()
     mock_outreach = MagicMock()
     mock_profile = MagicMock()
-    mocker.patch("backend.services.ai_engine.analyze_cv_jd_match", return_value=mock_match)
-    mocker.patch("backend.services.ai_engine.generate_outreach_messages", return_value=mock_outreach)
-    mocker.patch("backend.services.ai_engine.generate_profile_improvements", return_value=mock_profile)
+    mocker.patch(
+        "backend.services.ai_engine.analyze_cv_jd_match", return_value=mock_match
+    )
+    mocker.patch(
+        "backend.services.ai_engine.generate_outreach_messages",
+        return_value=mock_outreach,
+    )
+    mocker.patch(
+        "backend.services.ai_engine.generate_profile_improvements",
+        return_value=mock_profile,
+    )
 
     request = AnalysisRequest(cv_text="A" * 100, jd_text="B" * 100)
     result = await run_full_pipeline(request)
@@ -184,9 +217,14 @@ async def test_run_full_pipeline_success(mocker):
 
 async def test_run_full_pipeline_match_fails(mocker):
     """If match fails, outreach is skipped but profile improvements still run."""
-    mocker.patch("backend.services.ai_engine.analyze_cv_jd_match", side_effect=Exception("fail"))
+    mocker.patch(
+        "backend.services.ai_engine.analyze_cv_jd_match", side_effect=Exception("fail")
+    )
     mock_profile = MagicMock()
-    mocker.patch("backend.services.ai_engine.generate_profile_improvements", return_value=mock_profile)
+    mocker.patch(
+        "backend.services.ai_engine.generate_profile_improvements",
+        return_value=mock_profile,
+    )
 
     request = AnalysisRequest(cv_text="A" * 100, jd_text="B" * 100)
     result = await run_full_pipeline(request)
