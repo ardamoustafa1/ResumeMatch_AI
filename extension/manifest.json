@@ -12,6 +12,9 @@
     "https://www.linkedin.com/jobs/*",
     "http://localhost:8000/*"
   ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
   "action": {
     "default_popup": "popup.html"
   },
