@@ -1,0 +1,4 @@
+# These owners will be the default reviewers for pull requests in those areas.
+*       @ardamoustafa1
+/backend/ @ardamoustafa1
+/frontend/ @ardamoustafa1
