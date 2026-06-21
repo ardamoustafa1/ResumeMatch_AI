@@ -17,10 +17,15 @@ test:
 	cd frontend && npm test
 
 lint:
-	ruff check backend tests register_user.py setup_mock_user.py
-	ruff format --check backend tests register_user.py setup_mock_user.py
+	ruff check backend tests scripts/register_user.py scripts/setup_mock_user.py
+	ruff format --check backend tests scripts/register_user.py scripts/setup_mock_user.py
 	mypy backend
 	cd frontend && npm run lint
+	cd frontend && npm run typecheck
+	node --check extension/background.js
+	node --check extension/content.js
+	node --check extension/popup.js
+	node --test tests/extension.test.mjs
 
 build:
 	cd frontend && npm run build
