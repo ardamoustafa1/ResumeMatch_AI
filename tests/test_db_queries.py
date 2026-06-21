@@ -1,6 +1,6 @@
 """Tests for db/queries.py."""
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+
+from unittest.mock import AsyncMock
 from backend.db.queries import (
     create_analysis,
     get_analysis,
@@ -8,8 +8,6 @@ from backend.db.queries import (
     get_user_analyses,
     get_telegram_config,
 )
-
-pytestmark = pytest.mark.asyncio
 
 
 def make_conn():
@@ -21,6 +19,7 @@ def make_conn():
 async def test_create_analysis():
     conn = make_conn()
     import uuid
+
     fake_id = uuid.uuid4()
     conn.fetchval.return_value = fake_id
 
@@ -33,6 +32,7 @@ async def test_create_analysis():
 async def test_get_analysis_found():
     conn = make_conn()
     import uuid
+
     user_id = uuid.uuid4()
     analysis_id = uuid.uuid4()
     row = {
@@ -68,6 +68,7 @@ async def test_get_analysis_result_already_dict():
     """If result is already a dict (asyncpg jsonb), don't double-parse."""
     conn = make_conn()
     import uuid
+
     user_id = uuid.uuid4()
     analysis_id = uuid.uuid4()
     row = {
@@ -116,10 +117,18 @@ async def test_update_analysis_result_no_result():
 async def test_get_user_analyses():
     conn = make_conn()
     import uuid
+
     uid = uuid.uuid4()
     aid = uuid.uuid4()
     rows = [
-        {"id": aid, "user_id": uid, "company": "Corp", "recruiter_name": "Bob", "status": "completed", "created_at": "2025-01-01"}
+        {
+            "id": aid,
+            "user_id": uid,
+            "company": "Corp",
+            "recruiter_name": "Bob",
+            "status": "completed",
+            "created_at": "2025-01-01",
+        }
     ]
     conn.fetch.return_value = rows
 
