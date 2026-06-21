@@ -34,7 +34,7 @@ ENV PYTHONPATH="/app"
 
 # Copy only runtime application files
 COPY backend ./backend
-COPY register_user.py setup_mock_user.py ./
+COPY scripts/register_user.py scripts/setup_mock_user.py ./
 
 # Adjust permissions for non-root execution
 RUN chown -R appuser:appuser /app
