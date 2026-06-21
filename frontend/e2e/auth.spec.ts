@@ -5,8 +5,7 @@ test.describe('Auth Pages', () => {
   test('Login page renders correctly and passes accessibility', async ({ page }) => {
     await page.goto('/login');
     
-    // Assert elements exist
-    await expect(page.getByRole('heading', { name: /login/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /sign in to resumematch/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
     
     // Accessibility check
@@ -14,12 +13,13 @@ test.describe('Auth Pages', () => {
     expect(accessibilityScanResults.violations).toEqual([]);
   });
 
-  test('Register page renders correctly and passes accessibility', async ({ page }) => {
-    await page.goto('/register');
-    
-    // Assert elements exist
-    await expect(page.getByRole('heading', { name: /register/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /sign up/i })).toBeVisible();
+  test('Registration mode renders correctly and passes accessibility', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByRole('button', { name: /new here/i }).click();
+
+    await expect(page.getByRole('heading', { name: /create your account/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /create account/i })).toBeVisible();
+    await expect(page.getByRole('checkbox')).toBeVisible();
     
     // Accessibility check
     const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
