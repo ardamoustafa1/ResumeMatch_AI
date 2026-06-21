@@ -22,7 +22,9 @@ STEP_MESSAGES = {
 
 
 def _event_name(step: str) -> str:
-    if step in {"completed", "done", "partial_completed"}:
+    if step == "partial_completed":
+        return "partial_completed"
+    if step in {"completed", "done"}:
         return "completed"
     if step == "failed":
         return "failed"
