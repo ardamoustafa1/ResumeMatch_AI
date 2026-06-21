@@ -56,6 +56,18 @@ class Settings:
             raise RuntimeError(
                 "SECRET_KEY must be configured with at least 32 characters in production."
             )
+        if self.is_production and not self.secure_cookies:
+            raise RuntimeError("SECURE_COOKIES must be enabled in production.")
+        if self.is_production and (
+            not self.allowed_origins
+            or "*" in self.allowed_origins
+            or any(not origin.startswith("https://") for origin in self.allowed_origins)
+        ):
+            raise RuntimeError(
+                "ALLOWED_ORIGINS must contain explicit HTTPS origins in production."
+            )
+        if self.is_production and not self.frontend_url.startswith("https://"):
+            raise RuntimeError("FRONTEND_URL must use HTTPS in production.")
         if (
             self.is_production
             and self.email_verification_required
