@@ -1,50 +1,81 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# Load configuration from .env if exists
-if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+if [[ -f .env ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
 fi
 
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-resumematch_ai}"
-BACKUP_DIR="./backups"
+BACKUP_DIR="${BACKUP_DIR:-./backups}"
+COMMAND="${1:-}"
 
-# Ensure backup dir exists
+require_encryption_password() {
+    if [[ -z "${BACKUP_ENCRYPTION_PASSWORD:-}" ]]; then
+        echo "BACKUP_ENCRYPTION_PASSWORD is required." >&2
+        exit 1
+    fi
+}
+
 mkdir -p "$BACKUP_DIR"
-
-COMMAND=$1
+umask 077
 
 case "$COMMAND" in
     backup)
-        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-        BACKUP_FILE="${BACKUP_DIR}/db_backup_${TIMESTAMP}.sql"
-        echo "Creating database backup: ${BACKUP_FILE}..."
-        docker compose exec -T postgres pg_dump -U $POSTGRES_USER -d $POSTGRES_DB -F c > "$BACKUP_FILE"
-        echo "Backup completed successfully."
+        require_encryption_password
+        timestamp="$(date -u +"%Y%m%dT%H%M%SZ")"
+        backup_file="${BACKUP_DIR}/resumematch_${timestamp}.dump.enc"
+        checksum_file="${backup_file}.sha256"
+
+        docker compose exec -T postgres \
+            pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -F c \
+            | openssl enc -aes-256-cbc -salt -pbkdf2 \
+                -pass env:BACKUP_ENCRYPTION_PASSWORD \
+            > "$backup_file"
+
+        shasum -a 256 "$backup_file" > "$checksum_file"
+        echo "Encrypted backup created: $backup_file"
+        ;;
+    verify)
+        require_encryption_password
+        backup_file="${2:-}"
+        if [[ ! -f "$backup_file" ]]; then
+            echo "Backup file does not exist: $backup_file" >&2
+            exit 1
+        fi
+        if [[ -f "${backup_file}.sha256" ]]; then
+            shasum -a 256 -c "${backup_file}.sha256"
+        fi
+        openssl enc -d -aes-256-cbc -pbkdf2 \
+            -pass env:BACKUP_ENCRYPTION_PASSWORD \
+            -in "$backup_file" \
+            | docker compose exec -T postgres pg_restore --list >/dev/null
+        echo "Backup verified: $backup_file"
         ;;
     restore)
-        BACKUP_FILE=$2
-        if [ -z "$BACKUP_FILE" ]; then
-            echo "Error: Please specify the backup file to restore."
-            echo "Usage: $0 restore <backup_file>"
+        require_encryption_password
+        backup_file="${2:-}"
+        if [[ ! -f "$backup_file" ]]; then
+            echo "Backup file does not exist: $backup_file" >&2
             exit 1
         fi
-        if [ ! -f "$BACKUP_FILE" ]; then
-            echo "Error: Backup file $BACKUP_FILE does not exist."
+        if [[ "${CONFIRM_RESTORE:-}" != "YES" ]]; then
+            echo "Set CONFIRM_RESTORE=YES to authorize destructive restore." >&2
             exit 1
         fi
-        echo "Restoring database from: ${BACKUP_FILE}..."
-        
-        echo "WARNING: This will overwrite existing data. Press Ctrl+C to cancel."
-        sleep 3
-
-        # Use pg_restore with clean flag (-c) instead of dropping the DB manually
-        docker compose exec -T postgres pg_restore -U $POSTGRES_USER -d $POSTGRES_DB -c -1 < "$BACKUP_FILE"
-        echo "Restore completed successfully."
+        "$0" verify "$backup_file"
+        openssl enc -d -aes-256-cbc -pbkdf2 \
+            -pass env:BACKUP_ENCRYPTION_PASSWORD \
+            -in "$backup_file" \
+            | docker compose exec -T postgres \
+                pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists -1
+        echo "Restore completed: $backup_file"
         ;;
     *)
-        echo "Usage: $0 {backup|restore <file>}"
+        echo "Usage: $0 {backup|verify <file>|restore <file>}" >&2
         exit 1
         ;;
 esac
