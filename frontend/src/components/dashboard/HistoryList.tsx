@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { History, Trash2 } from "lucide-react"
+import { History, Trash2, GitCompare } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { HistoryChart } from "./HistoryChart"
@@ -11,8 +11,13 @@ export function HistoryList({ history, deleteAnalysis }: { history: AnalysisReco
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <History className="size-4 text-zinc-400" /> Recent analyses
+        <CardTitle className="flex items-center justify-between text-base">
+          <div className="flex items-center gap-2">
+            <History className="size-4 text-zinc-400" /> Recent analyses
+          </div>
+          <Link href="/dashboard/compare" className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300">
+            <GitCompare className="size-3.5" /> Compare CVs
+          </Link>
         </CardTitle>
         <HistoryChart history={history} />
       </CardHeader>
