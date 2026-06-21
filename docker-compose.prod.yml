@@ -1,9 +1,10 @@
 services:
   api:
+    image: ghcr.io/ardamoustafa/networkforge-api:v1.0.0
     command: >
       sh -c "alembic -c backend/db/migrations/alembic.ini upgrade head &&
              uvicorn backend.main:app --host 0.0.0.0 --port 8000
-             --workers 2 --proxy-headers"
+             --workers 1 --proxy-headers"
     volumes: !reset []
     restart: unless-stopped
     environment:
@@ -13,6 +14,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required in production}
       REDIS_URL: ${REDIS_URL:?REDIS_URL is required in production}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required in production}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required in production}
     deploy:
       resources:
         limits:
@@ -20,11 +22,13 @@ services:
           memory: 768M
 
   frontend:
+    image: ghcr.io/ardamoustafa/networkforge-frontend:v1.0.0
     command: node server.js
     volumes: !reset []
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      NEXT_PUBLIC_WS_URL: ""
     deploy:
       resources:
         limits:
@@ -32,6 +36,7 @@ services:
           memory: 512M
 
   worker:
+    image: ghcr.io/ardamoustafa/networkforge-worker:v1.0.0
     volumes: !reset []
     restart: unless-stopped
     environment:
@@ -46,14 +51,29 @@ services:
           memory: 1024M
 
   postgres:
+    image: postgres:16-alpine
     restart: unless-stopped
     ports: !reset []
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in production}
 
   redis:
+    image: redis:7-alpine
     restart: unless-stopped
     ports: !reset []
+    command: redis-server --requirepass ${REDIS_PASSWORD:-secure-redis-pass}
 
   redis-commander:
     profiles: ["disabled"]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    # Ports removed for security; must be accessed via internal network or proxy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    # Ports removed for security; must be accessed via internal network or proxy
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required in production}
