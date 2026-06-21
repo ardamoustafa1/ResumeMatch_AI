@@ -11,6 +11,6 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   - job_name: 'resumematch_api'
-    metrics_path: '/api/v1/metrics'
+    metrics_path: '/metrics'
     static_configs:
       - targets: ['api:8000']
