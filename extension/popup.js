@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveBtn = document.getElementById('saveBtn');
   const statusDiv = document.getElementById('status');
 
-  chrome.storage.local.get(['apiToken', 'apiBaseUrl', 'cvText'], (result) => {
+  chrome.storage.session.get(['apiToken', 'apiBaseUrl', 'cvText'], (result) => {
     if (result.apiToken) apiTokenInput.value = result.apiToken;
     apiBaseUrlInput.value = result.apiBaseUrl || 'http://localhost:8000';
     if (result.cvText) cvTextInput.value = result.cvText;
@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
     }
-    chrome.storage.local.set({
+    chrome.storage.session.set({
       apiToken: apiTokenInput.value.trim(),
       apiBaseUrl,
       cvText: cvTextInput.value.trim()
