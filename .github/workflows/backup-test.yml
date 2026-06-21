@@ -1,0 +1,71 @@
+name: Backup Script Test
+
+on:
+  schedule:
+    - cron: "0 0 1 * *" # Runs monthly
+  workflow_dispatch:
+
+jobs:
+  test-backup:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: resumematch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d resumematch"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install PostgreSQL Client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      
+      - name: Insert Mock Data
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d resumematch -c "CREATE TABLE users (id serial, email text);"
+          psql -h localhost -U postgres -d resumematch -c "INSERT INTO users (email) VALUES ('backup_test@example.com');"
+
+      - name: Run Backup Script
+        env:
+          DB_HOST: localhost
+          DB_USER: postgres
+          DB_PASS: postgres
+          DB_NAME: resumematch
+          BACKUP_DIR: ./backups
+        run: |
+          chmod +x scripts/backup_restore.sh
+          ./scripts/backup_restore.sh backup
+      
+      - name: Drop and Restore
+        env:
+          PGPASSWORD: postgres
+          DB_HOST: localhost
+          DB_USER: postgres
+          DB_PASS: postgres
+          DB_NAME: resumematch
+        run: |
+          psql -h localhost -U postgres -d resumematch -c "DROP TABLE users;"
+          BACKUP_FILE=$(ls -t ./backups/*.sql.gz | head -1)
+          gunzip -c $BACKUP_FILE | psql -h localhost -U postgres -d resumematch
+          
+      - name: Verify Restoration
+        env:
+          PGPASSWORD: postgres
+        run: |
+          RESULT=$(psql -h localhost -U postgres -d resumematch -t -c "SELECT COUNT(*) FROM users;")
+          if [ "$RESULT" -eq 0 ]; then
+            echo "Restoration failed. No data found."
+            exit 1
+          fi
+          echo "Backup and Restoration verified successfully!"
