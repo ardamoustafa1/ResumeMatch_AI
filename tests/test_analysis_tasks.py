@@ -1,9 +1,7 @@
 """Tests for analysis_tasks.py - covers _process_analysis and _mark_analysis_failed."""
-import asyncio
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
-pytestmark = pytest.mark.asyncio
+import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 
 def make_mock_pool(record=None, acquired=True):
@@ -24,7 +22,14 @@ def make_mock_pool(record=None, acquired=True):
 
 async def test_process_analysis_already_completed(mocker):
     """If analysis is already completed, skip without doing anything."""
-    record = {"status": "completed", "cv_text": "cv", "jd_text": "jd", "company": "Corp", "recruiter_name": "Bob", "user_id": "user-1"}
+    record = {
+        "status": "completed",
+        "cv_text": "cv",
+        "jd_text": "jd",
+        "company": "Corp",
+        "recruiter_name": "Bob",
+        "user_id": "user-1",
+    }
     mock_db_pool, mock_conn = make_mock_pool(record)
 
     mocker.patch("backend.tasks.analysis_tasks.db_pool", mock_db_pool)
@@ -32,6 +37,7 @@ async def test_process_analysis_already_completed(mocker):
     mock_publish = mocker.patch("backend.tasks.analysis_tasks.publish_progress_sync")
 
     from backend.tasks.analysis_tasks import _process_analysis
+
     await _process_analysis("analysis-001")
 
     mock_publish.assert_not_called()
@@ -39,12 +45,21 @@ async def test_process_analysis_already_completed(mocker):
 
 async def test_process_analysis_lock_not_acquired(mocker):
     """If Redis lock cannot be acquired, raise RuntimeError."""
-    record = {"status": "pending", "cv_text": "cv", "jd_text": "jd", "company": "Corp", "recruiter_name": "Bob", "user_id": "user-1"}
+    record = {
+        "status": "pending",
+        "cv_text": "cv",
+        "jd_text": "jd",
+        "company": "Corp",
+        "recruiter_name": "Bob",
+        "user_id": "user-1",
+    }
     mock_db_pool, mock_conn = make_mock_pool(record)
 
     mocker.patch("backend.tasks.analysis_tasks.db_pool", mock_db_pool)
     mocker.patch("backend.tasks.analysis_tasks.get_analysis", return_value=record)
-    mocker.patch("backend.tasks.analysis_tasks.update_analysis_result", return_value=True)
+    mocker.patch(
+        "backend.tasks.analysis_tasks.update_analysis_result", return_value=True
+    )
     mocker.patch("backend.tasks.analysis_tasks.publish_progress_sync")
 
     mock_redis = AsyncMock()
@@ -54,6 +69,7 @@ async def test_process_analysis_lock_not_acquired(mocker):
     mocker.patch("backend.tasks.analysis_tasks.async_redis_client", mock_redis)
 
     from backend.tasks.analysis_tasks import _process_analysis
+
     with pytest.raises(RuntimeError, match="Lock could not be acquired"):
         await _process_analysis("analysis-001")
 
@@ -66,6 +82,7 @@ async def test_process_analysis_record_not_found(mocker):
     mocker.patch("backend.tasks.analysis_tasks.get_analysis", return_value=None)
 
     from backend.tasks.analysis_tasks import _process_analysis
+
     with pytest.raises(LookupError):
         await _process_analysis("nonexistent-id")
 
@@ -77,6 +94,7 @@ async def test_process_analysis_no_pool(mocker):
     mocker.patch("backend.tasks.analysis_tasks.db_pool", mock_db_pool)
 
     from backend.tasks.analysis_tasks import _process_analysis
+
     with pytest.raises(RuntimeError, match="DB pool not initialized"):
         await _process_analysis("analysis-001")
 
@@ -94,7 +112,9 @@ async def test_process_analysis_success(mocker):
     mock_db_pool, mock_conn = make_mock_pool(record)
     mocker.patch("backend.tasks.analysis_tasks.db_pool", mock_db_pool)
     mocker.patch("backend.tasks.analysis_tasks.get_analysis", return_value=record)
-    mocker.patch("backend.tasks.analysis_tasks.update_analysis_result", return_value=True)
+    mocker.patch(
+        "backend.tasks.analysis_tasks.update_analysis_result", return_value=True
+    )
     mocker.patch("backend.tasks.analysis_tasks.publish_progress_sync")
     mocker.patch("backend.tasks.analysis_tasks.get_telegram_config", return_value=None)
 
@@ -102,9 +122,17 @@ async def test_process_analysis_success(mocker):
     mock_outreach = MagicMock()
     mock_profile = MagicMock()
 
-    mocker.patch("backend.tasks.analysis_tasks.analyze_cv_jd_match", return_value=mock_match)
-    mocker.patch("backend.tasks.analysis_tasks.generate_outreach_messages", return_value=mock_outreach)
-    mocker.patch("backend.tasks.analysis_tasks.generate_profile_improvements", return_value=mock_profile)
+    mocker.patch(
+        "backend.tasks.analysis_tasks.analyze_cv_jd_match", return_value=mock_match
+    )
+    mocker.patch(
+        "backend.tasks.analysis_tasks.generate_outreach_messages",
+        return_value=mock_outreach,
+    )
+    mocker.patch(
+        "backend.tasks.analysis_tasks.generate_profile_improvements",
+        return_value=mock_profile,
+    )
 
     mock_redis = AsyncMock()
     mock_redis.set = AsyncMock(return_value=True)  # lock acquired
@@ -113,6 +141,7 @@ async def test_process_analysis_success(mocker):
     mocker.patch("backend.tasks.analysis_tasks.async_redis_client", mock_redis)
 
     from backend.tasks.analysis_tasks import _process_analysis
+
     await _process_analysis("analysis-001")
 
     mock_redis.set.assert_called_once()
@@ -131,13 +160,23 @@ async def test_process_analysis_outreach_fails_partial(mocker):
     mock_db_pool, mock_conn = make_mock_pool(record)
     mocker.patch("backend.tasks.analysis_tasks.db_pool", mock_db_pool)
     mocker.patch("backend.tasks.analysis_tasks.get_analysis", return_value=record)
-    mocker.patch("backend.tasks.analysis_tasks.update_analysis_result", return_value=True)
+    mocker.patch(
+        "backend.tasks.analysis_tasks.update_analysis_result", return_value=True
+    )
     mock_publish = mocker.patch("backend.tasks.analysis_tasks.publish_progress_sync")
     mocker.patch("backend.tasks.analysis_tasks.get_telegram_config", return_value=None)
 
-    mocker.patch("backend.tasks.analysis_tasks.analyze_cv_jd_match", return_value=MagicMock())
-    mocker.patch("backend.tasks.analysis_tasks.generate_outreach_messages", side_effect=Exception("AI Error"))
-    mocker.patch("backend.tasks.analysis_tasks.generate_profile_improvements", return_value=MagicMock())
+    mocker.patch(
+        "backend.tasks.analysis_tasks.analyze_cv_jd_match", return_value=MagicMock()
+    )
+    mocker.patch(
+        "backend.tasks.analysis_tasks.generate_outreach_messages",
+        side_effect=Exception("AI Error"),
+    )
+    mocker.patch(
+        "backend.tasks.analysis_tasks.generate_profile_improvements",
+        return_value=MagicMock(),
+    )
 
     mock_redis = AsyncMock()
     mock_redis.set = AsyncMock(return_value=True)
@@ -146,6 +185,7 @@ async def test_process_analysis_outreach_fails_partial(mocker):
     mocker.patch("backend.tasks.analysis_tasks.async_redis_client", mock_redis)
 
     from backend.tasks.analysis_tasks import _process_analysis
+
     await _process_analysis("analysis-001")
 
     # Should have published partial_completed
@@ -160,6 +200,7 @@ async def test_mark_analysis_failed_no_pool(mocker):
     mocker.patch("backend.tasks.analysis_tasks.db_pool", mock_db_pool)
 
     from backend.tasks.analysis_tasks import _mark_analysis_failed
+
     await _mark_analysis_failed("analysis-001", Exception("test"))
 
 
@@ -169,12 +210,15 @@ async def test_mark_analysis_failed_with_pool(mocker):
     mock_db_pool, mock_conn = make_mock_pool(record)
     mocker.patch("backend.tasks.analysis_tasks.db_pool", mock_db_pool)
     mocker.patch("backend.tasks.analysis_tasks.get_analysis", return_value=record)
-    mock_update = mocker.patch("backend.tasks.analysis_tasks.update_analysis_result", return_value=True)
+    mock_update = mocker.patch(
+        "backend.tasks.analysis_tasks.update_analysis_result", return_value=True
+    )
     mock_publish = mocker.patch("backend.tasks.analysis_tasks.publish_progress_sync")
     mocker.patch("backend.tasks.analysis_tasks.get_telegram_config", return_value=None)
     mocker.patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": ""})
 
     from backend.tasks.analysis_tasks import _mark_analysis_failed
+
     await _mark_analysis_failed("analysis-001", Exception("test error"))
 
     mock_update.assert_called_once_with(
@@ -195,6 +239,7 @@ async def test_mark_analysis_failed_already_completed(mocker):
     mock_update = mocker.patch("backend.tasks.analysis_tasks.update_analysis_result")
 
     from backend.tasks.analysis_tasks import _mark_analysis_failed
+
     await _mark_analysis_failed("analysis-001", Exception("test"))
 
     mock_update.assert_not_called()
