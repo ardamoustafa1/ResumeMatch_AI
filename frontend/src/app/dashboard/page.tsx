@@ -16,6 +16,7 @@ import { HistoryList } from "@/components/dashboard/HistoryList"
 import { ChromeExtensionCard } from "@/components/dashboard/ExtensionCard"
 import { AccountDataCard } from "@/components/dashboard/AccountDataCard"
 import { ResultsPanel } from "@/components/dashboard/ResultsPanel"
+import { WorkspaceSwitcher } from "@/components/dashboard/WorkspaceSwitcher"
 import { motion } from "framer-motion"
 import { BrandMark } from "@/components/brand-mark"
 
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   const [recruiterName, setRecruiterName] = useState("")
   const [provider, setProvider] = useState("auto")
   const [language, setLanguage] = useState("English")
+  const [scoringStrategy, setScoringStrategy] = useState("default")
   const [analyzing, setAnalyzing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -53,7 +55,9 @@ export default function DashboardPage() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const data = await apiFetch<{ items: AnalysisRecord[] }>("/analysis?limit=8")
+      const wsId = localStorage.getItem("activeWorkspace")
+      const query = wsId ? `/analysis?limit=8&workspace_id=${wsId}` : "/analysis?limit=8"
+      const data = await apiFetch<{ items: AnalysisRecord[] }>(query)
       setHistory(data.items)
     } catch {
       // History is non-critical to the main workflow.
@@ -71,7 +75,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    apiFetch<{ items: AnalysisRecord[] }>("/analysis?limit=8")
+    const wsId = localStorage.getItem("activeWorkspace")
+    const query = wsId ? `/analysis?limit=8&workspace_id=${wsId}` : "/analysis?limit=8"
+    apiFetch<{ items: AnalysisRecord[] }>(query)
       .then((data) => {
         if (!cancelled) setHistory(data.items)
       })
@@ -175,6 +181,8 @@ export default function DashboardPage() {
           recruiter_name: recruiterName || null,
           provider: provider,
           language: language,
+          scoring_strategy: scoringStrategy,
+          workspace_id: localStorage.getItem("activeWorkspace") || null,
         }),
       })
       setLogs((current) => [...current, `Job queued · ${data.analysis_id}`])
@@ -226,8 +234,7 @@ export default function DashboardPage() {
             <BrandMark />
             <span className="hidden h-5 w-px bg-white/[0.08] sm:block" />
             <div className="hidden sm:block">
-              <p className="text-[11px] font-medium text-zinc-400">Opportunity workspace</p>
-              <p className="text-[10px] text-zinc-700">{user.email}</p>
+              <WorkspaceSwitcher />
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -251,6 +258,7 @@ export default function DashboardPage() {
             recruiterName={recruiterName} setRecruiterName={setRecruiterName}
             provider={provider} setProvider={setProvider}
             language={language} setLanguage={setLanguage}
+            scoringStrategy={scoringStrategy} setScoringStrategy={setScoringStrategy}
             cvText={cvText} setCvText={setCvText}
             jdText={jdText} setJdText={setJdText}
             uploading={uploading} analyzing={analyzing}
