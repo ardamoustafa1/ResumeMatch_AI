@@ -10,6 +10,8 @@ interface AnalysisFormProps {
   setProvider: (v: string) => void
   language: string
   setLanguage: (v: string) => void
+  scoringStrategy: string
+  setScoringStrategy: (v: string) => void
   cvText: string
   setCvText: (v: string) => void
   jdText: string
@@ -23,6 +25,7 @@ interface AnalysisFormProps {
 export function AnalysisForm({
   company, setCompany, recruiterName, setRecruiterName,
   provider, setProvider, language, setLanguage,
+  scoringStrategy, setScoringStrategy,
   cvText, setCvText, jdText, setJdText,
   uploading, analyzing, uploadCv, startAnalysis
 }: AnalysisFormProps) {
@@ -125,6 +128,8 @@ export function AnalysisForm({
                 <option value="auto">Auto · fastest available</option>
                 <option value="groq">Groq · fast cloud</option>
                 <option value="ollama">Ollama · private local</option>
+                <option value="openai">OpenAI · GPT-4o (if configured)</option>
+                <option value="anthropic">Anthropic · Claude 3 (if configured)</option>
               </select>
             </label>
             <label className="block">
@@ -135,6 +140,13 @@ export function AnalysisForm({
                 <option value="Spanish">Spanish</option>
                 <option value="French">French</option>
                 <option value="German">German</option>
+              </select>
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-2 block text-[11px] text-zinc-500">Scoring Strategy</span>
+              <select value={scoringStrategy} onChange={(e) => setScoringStrategy(e.target.value)} className="field appearance-none">
+                <option value="default">Default · Standard Math Curve Penalty</option>
+                <option value="strict_keyword">Strict Keyword · Harsh Missing Penalty</option>
               </select>
             </label>
           </div>
