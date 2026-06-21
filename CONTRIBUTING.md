@@ -13,10 +13,10 @@ First off, thank you for considering contributing to ResumeMatch AI! It's people
 1. Create a descriptive branch name (`git checkout -b feat/add-new-model` or `fix/ws-race-condition`).
 2. Make your changes in small, logical commits.
 3. Ensure all tests pass. If you're adding a new feature, please add corresponding test coverage.
-    - Run backend tests: `cd backend && pytest`
+    - Run backend tests: `pytest`
     - Run frontend tests: `cd frontend && npm test`
 4. Lint and format your code:
-    - Backend: `ruff check .` and `black .`
+    - Backend: `ruff check backend tests` and `ruff format --check backend tests`
     - Frontend: `npm run lint`
 
 ## Pull Request Process
@@ -26,6 +26,10 @@ First off, thank you for considering contributing to ResumeMatch AI! It's people
 3. Provide a clear and comprehensive description of the changes. Include screenshots or videos if you are making UI changes.
 4. Ensure your PR passes all GitHub Actions CI checks (CodeQL, Gitleaks, Pytest, Linting).
 5. Address any review comments promptly.
+
+Run the complete local gate with `make qa`. Pull requests that change
+authentication, privacy, provider data flow, uploads, or deployment behavior
+must update the threat model and relevant tests.
 
 ## Code of Conduct
 
