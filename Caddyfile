@@ -1,5 +1,5 @@
 # Caddyfile for local TLS and production reverse proxy
-localhost, {env.DOMAIN_NAME} {
+{$DOMAIN_NAME:localhost} {
     handle /api/* {
         reverse_proxy api:8000
     }
