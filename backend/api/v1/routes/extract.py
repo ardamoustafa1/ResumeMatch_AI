@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, Security
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile, Security
 
 from backend.api.deps import get_current_user, Scope
 from backend.core.config import settings
@@ -36,7 +36,7 @@ async def _read_limited(file: UploadFile) -> bytes:
 async def extract_text(
     request: Request,
     file: UploadFile = File(...),
-    current_user: dict = Security(get_current_user, scopes=[Scope.EXTENSION]),
+    current_user: dict = Security(get_current_user, scopes=[Scope.EXTRACT]),
 ):
     del current_user
     if not file.filename:
