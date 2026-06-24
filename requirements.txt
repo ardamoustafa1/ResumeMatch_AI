@@ -24,7 +24,7 @@ Pillow==12.2.0
 prometheus_client==0.25.0
 setuptools
 
-pyotp==2.9.0
+pyotp==2.10.0
 qrcode[pil]==7.4.2
 
 opentelemetry-api==1.25.0
